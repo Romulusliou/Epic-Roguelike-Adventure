@@ -116,26 +116,103 @@ bullet_count = 3  # Number of bullets fired at once
 bullet_spread = math.radians(30)  # Spread angle of 30°
 last_dir = (0, -1)
 
+def melee_attack():
+    """執行近戰攻擊（劍），檢測範圍內的敵人並造成傷害。"""
+    global enemies
+    sword_range = 50  # 劍攻擊範圍
+    for enemy in enemies:
+        if math.hypot(enemy.x - player_x, enemy.y - player_y) < sword_range:
+            enemy.hp -= 25  # 劍的傷害
+            enemy.burn_time = 3000  # 點燃敵人 3 秒
+            enemy.last_burn_tick = pygame.time.get_ticks()
+            add_floating_text("⚔️ Sword Slash!", (enemy.x, enemy.y), 1000)  # 顯示攻擊特效
+
+
+
+def ranged_attack():
+    """執行遠程攻擊（子彈），生成新的子彈並追蹤敵人。"""
+    global bullets
+    bullet_speed = 8
+    bullet_damage = 10
+    bullets.append({"x": player_x, "y": player_y, "vx": bullet_speed, "vy": 0, "damage": bullet_damage})
+
+
+def handle_attacks():
+    """統一處理攻擊，根據輸入決定近戰或遠程攻擊。"""
+    keys = pygame.key.get_pressed()
+    if keys[pygame.K_SPACE]:  # 近戰攻擊（按空格鍵）
+        melee_attack()
+    if keys[pygame.K_SPACE]:  # 遠程攻擊（按 F 鍵）
+        ranged_attack()
+
+# ================= upgrade system =====================
+def draw_upgrade_overlay(frame_surface):
+    # 在已有戰鬥畫面上疊加半透明濾鏡
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((255, 255, 255, 0))
+    frame_surface.blit(overlay, (0, 0))
+    
+    box_width, box_height = 300, 200
+    spacing = 50
+    total_width = 3 * box_width + 2 * spacing
+    start_x = (WIDTH - total_width) // 2
+    start_y = (HEIGHT - box_height) // 2
+
+    box1 = pygame.Rect(start_x, start_y, box_width, box_height)
+    pygame.draw.rect(frame_surface, BLACK, box1, 2)
+    pygame.draw.rect(frame_surface, GREEN, (box1.x + 20, box1.y + 20, box_width - 40, box_height - 80))
+    txt1 = upgrade_font.render("Increase HP +20", True, BLACK)
+    frame_surface.blit(txt1, (box1.x + 20, box1.y + box_height - 50))
+
+    box2 = pygame.Rect(start_x + box_width + spacing, start_y, box_width, box_height)
+    pygame.draw.rect(frame_surface, BLACK, box2, 2)
+    pygame.draw.rect(frame_surface, ORANGE, (box2.x + 20, box2.y + 20, box_width - 40, box_height - 80))
+    txt2 = upgrade_font.render("Increase Attack +5", True, BLACK)
+    frame_surface.blit(txt2, (box2.x + 20, box2.y + box_height - 50))
+
+    box3 = pygame.Rect(start_x + 2 * (box_width + spacing), start_y, box_width, box_height)
+    pygame.draw.rect(frame_surface, BLACK, box3, 2)
+    if player_level >= 3:
+        pygame.draw.rect(frame_surface, BLUE, (box3.x + 20, box3.y + 20, box_width - 40, box_height - 80))
+        txt3 = upgrade_font.render("Acquire Gun", True, BLACK)
+    else:
+        pygame.draw.rect(frame_surface, (200, 200, 200), (box3.x + 20, box3.y + 20, box_width - 40, box_height - 80))
+        txt3 = upgrade_font.render("(Locked)", True, BLACK)
+    frame_surface.blit(txt3, (box3.x + 20, box3.y + box_height - 50))
+
+    prompt = upgrade_font.render("Choose upgrade (Press 1, 2, or 3)", True, BLACK)
+    frame_surface.blit(prompt, (WIDTH//2 - prompt.get_width()//2, start_y + box_height + 20))
+    screen.blit(frame_surface, (0, 0))
+    pygame.display.update()
+
+
+
+# === Begin Enemy Management Module ===
+ENEMY_STATS = {
+    "normal": {"speed": 2, "size": 20, "color": RED, "max_hp": 100},
+    "elite": {"speed": 3, "size": 20, "color": PURPLE, "max_hp": 150},
+    "swift": {"speed": 4, "size": 18, "color": (0, 200, 200), "max_hp": 80},
+    "tank": {"speed": 1, "size": 30, "color": (100, 100, 100), "max_hp": 200},
+    "healer": {"speed": 2, "size": 22, "color": (0, 255, 255), "max_hp": 120},
+    "bomber": {"speed": 2, "size": 24, "color": (255, 165, 0), "max_hp": 100},
+    "summoner": {"speed": 1.5, "size": 26, "color": (255, 0, 255), "max_hp": 130},
+    "boss": {"speed": 1, "size": 40, "color": DARK_RED, "max_hp": 500}
+}
+
 class Enemy:
     def __init__(self, x, y, etype, wave):
         self.x = x
         self.y = y
         self.etype = etype
         self.set_attributes(etype, wave)
-        self.burn_time = 0 
+        self.burn_time = 0
         self.last_burn_tick = 0
-
     def set_attributes(self, etype, wave):
-        stats = {
-            "normal": {"speed": 2, "size": 20, "color": RED, "max_hp": 100},
-            "elite": {"speed": 3, "size": 20, "color": PURPLE, "max_hp": 150},
-            "boss": {"speed": 1, "size": 40, "color": DARK_RED, "max_hp": 500}
-        }[etype]
+        stats = ENEMY_STATS[etype]
         self.speed = stats["speed"] * (0.5 if wave == 1 else 1 + (wave - 1) * 0.1)
         self.size = stats["size"]
         self.color = stats["color"]
         self.hp = self.max_hp = stats["max_hp"]
-
     def move_towards(self, target_x, target_y):
         if target_x > self.x:
             self.x += self.speed
@@ -145,23 +222,53 @@ class Enemy:
             self.y += self.speed
         elif target_y < self.y:
             self.y -= self.speed
-
-    def take_damage(self, amount):
-        self.hp -= amount
-
     def apply_burn(self, current_time):
         if self.burn_time > 0 and current_time - self.last_burn_tick >= 1000:
             self.hp -= 5
             self.burn_time -= 1000
             self.last_burn_tick = current_time
-
     def draw(self, surface):
         rect = pygame.Rect(self.x, self.y, self.size, self.size)
         pygame.draw.rect(surface, self.color, rect)
         pygame.draw.rect(surface, BLACK, (self.x, self.y - 10, self.size, 5))
-        hp_bar_width = self.size * (self.hp / self.max_hp) if self.max_hp else 0
-        pygame.draw.rect(surface, GREEN, (self.x, self.y - 10, hp_bar_width, 5))
+        hp_bar = self.size * (self.hp / self.max_hp) if self.max_hp else 0
+        pygame.draw.rect(surface, GREEN, (self.x, self.y - 10, hp_bar, 5))
 # === End Enemy Management Module ===
+
+# 定義全局敵人管理變數（替換原有敵人參數區段）
+total_enemies_in_wave = 20
+remaining_enemies_to_spawn = total_enemies_in_wave
+max_enemies_on_screen = 10
+current_wave = 1
+max_waves = 10
+enemies = []
+# ================= End Enemy Management =====================
+
+def spawn_enemy(wave):
+    if wave == max_waves:
+        if not any(enemy.etype == "boss" for enemy in enemies):
+            etype = "boss"
+        else:
+            etype = random.choice(["normal", "elite"])
+    else:
+        if wave >= 6:
+            types = ["normal", "elite", "swift", "tank", "healer", "bomber", "summoner"]
+        elif wave == 5:
+            types = ["normal", "elite", "swift", "tank", "healer", "bomber"]
+        elif wave == 4:
+            types = ["normal", "elite", "swift", "tank", "healer"]
+        elif wave == 3:
+            types = ["normal", "elite", "swift", "tank"]
+        elif wave == 2:
+            types = ["normal", "elite", "swift"]
+        else:
+            types = ["normal", "elite"]
+        etype = random.choice(types)
+    x = random.randint(0, WIDTH - 100)
+    y = random.randint(0, HEIGHT - 100)
+    return Enemy(x, y, etype, wave)
+
+
 
 # ================= Energy Core Timer =====================
 last_elec_time = 0
@@ -237,6 +344,49 @@ def end_screen():
                     return True
                 elif event.key == pygame.K_q:
                     return False
+                
+def draw_hp_bar(surface, player_hp, player_max_hp):
+    """繪製血條"""
+    hp_bar_width = 200
+    hp_ratio = player_hp / player_max_hp
+    pygame.draw.rect(surface, BLACK, (WIDTH - hp_bar_width - 20, 20, hp_bar_width, 20))
+    pygame.draw.rect(surface, GREEN, (WIDTH - hp_bar_width - 20, 20, hp_bar_width * hp_ratio, 20))
+    hp_text = font.render(f"HP: {player_hp}/{player_max_hp}", True, BLACK)
+    surface.blit(hp_text, (WIDTH - hp_bar_width - 20, 50))
+
+def draw_exp_bar(surface, player_exp, player_level):
+    """繪製經驗條"""
+    exp_bar_width = 200
+    required_exp = 30 * (player_level ** 2)
+    exp_ratio = player_exp / required_exp
+    pygame.draw.rect(surface, BLACK, (20, 20, exp_bar_width, 10))
+    pygame.draw.rect(surface, GREEN, (20, 20, exp_bar_width * exp_ratio, 10))
+
+def draw_game_info(surface, player_level, current_wave, max_waves):
+    """顯示遊戲基本資訊"""
+    level_text = font.render(f"Level: {player_level}", True, BLACK)
+    surface.blit(level_text, (20, 40))
+    wave_text = font.render(f"Wave: {current_wave}/{max_waves}", True, BLACK)
+    surface.blit(wave_text, (20, 100))
+
+def draw_equipment_panel(surface, player_equipment, equipment_icons, equipment_descriptions):
+    """繪製裝備欄"""
+    panel_x = WIDTH - 300
+    panel_y = 150
+    panel_width = 280
+    panel_height = 300
+    pygame.draw.rect(surface, BLACK, (panel_x, panel_y, panel_width, panel_height), 2)
+    for i, eq in enumerate(player_equipment):
+        icon = equipment_icons.get(eq["name"], eq["name"])
+        if eq["rare"]:
+            icon += "★"
+        txt_icon = equip_font.render(icon, True, BLACK)
+        txt_desc = upgrade_font.render(equipment_descriptions.get(eq["name"], ""), True, BLACK)
+        surface.blit(txt_icon, (panel_x + 10, panel_y + 10 + i * 50))
+        surface.blit(txt_desc, (panel_x + 50, panel_y + 10 + i * 50))
+
+is_upgrading = False  # 是否進入升級狀態
+upgrade_done = False  # 升級選項是否選擇完成
 
 start_screen()
 
@@ -493,25 +643,12 @@ while running:
     # ---------- Draw Floating Texts ----------
     draw_floating_texts(frame_surface)
     
-    # ---------- Draw Player Interface ----------
-    hp_bar_width = 200
-    hp_ratio = player_hp / player_max_hp
-    pygame.draw.rect(frame_surface, BLACK, (WIDTH - hp_bar_width - 20, 20, hp_bar_width, 20))
-    pygame.draw.rect(frame_surface, GREEN, (WIDTH - hp_bar_width - 20, 20, hp_bar_width * hp_ratio, 20))
-    hp_text = font.render(f"HP: {player_hp}/{player_max_hp}", True, BLACK)
-    frame_surface.blit(hp_text, (WIDTH - hp_bar_width - 20, 50))
-    
-    exp_bar_width = 200
-    # Use an increasing EXP curve: required_exp = 30 * (player_level ** 2)
-    required_exp = 30 * (player_level ** 2)
-    exp_ratio = player_exp / required_exp
-    pygame.draw.rect(frame_surface, BLACK, (20, 20, exp_bar_width, 10))
-    pygame.draw.rect(frame_surface, GREEN, (20, 20, exp_bar_width * exp_ratio, 10))
-    
-    level_text = font.render(f"Level: {player_level}", True, BLACK)
-    frame_surface.blit(level_text, (20, 40))
-    wave_text = font.render(f"Wave: {current_wave}/{max_waves}", True, BLACK)
-    frame_surface.blit(wave_text, (20, 100))
+    # 呼叫 UI 繪製函數
+    draw_hp_bar(frame_surface, player_hp, player_max_hp)
+    draw_exp_bar(frame_surface, player_exp, player_level)
+    draw_game_info(frame_surface, player_level, current_wave, max_waves)
+    draw_equipment_panel(frame_surface, player_equipment, equipment_icons, equipment_descriptions)
+
     # Top-center: Remaining enemy count
     total_remaining = len(enemies) + remaining_enemies_to_spawn
     enemy_count_text = upgrade_font.render(f"Enemies Left: {total_remaining}", True, BLACK)
@@ -570,24 +707,15 @@ while running:
     
     # ---------- Level Up Check ----------
     # Required EXP increases quadratically: required_exp = 30 * (player_level^2)
+    # 在主遊戲循環內
+    required_exp = 30 * (player_level ** 2)
     if player_exp >= required_exp:
+        player_exp = 0
+        is_upgrading = True
         upgrade_done = False
+        # 保留當前戰鬥畫面在 frame_surface 中（假設它已經包含所有戰鬥元素）\n
         while not upgrade_done:
-            upgrade_surface = pygame.Surface((WIDTH, HEIGHT))
-            upgrade_surface.fill(WHITE)
-            option1 = upgrade_font.render("1. Increase HP +20", True, BLACK)
-            option2 = upgrade_font.render("2. Increase Attack +5", True, BLACK)
-            if player_level >= 3:
-                option3 = upgrade_font.render("3. Acquire Gun", True, BLACK)
-            else:
-                option3 = upgrade_font.render("3. (Locked)", True, BLACK)
-            prompt = upgrade_font.render("Choose upgrade (Press 1, 2, or 3)", True, BLACK)
-            upgrade_surface.blit(option1, (100, 150))
-            upgrade_surface.blit(option2, (100, 210))
-            upgrade_surface.blit(option3, (100, 270))
-            upgrade_surface.blit(prompt, (100, 330))
-            screen.blit(upgrade_surface, (0, 0))
-            pygame.display.update()
+            draw_upgrade_overlay(frame_surface)
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit(); sys.exit()
@@ -602,8 +730,12 @@ while running:
                     elif event.key == pygame.K_3 and player_level >= 3:
                         weapons["bullet"] = True
                         upgrade_done = True
+        is_upgrading = False
         player_level += 1
-        player_exp = 0
+
+
+
+
     
     # ---------- Player Death Check ----------
     if player_hp <= 0:
