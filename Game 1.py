@@ -68,13 +68,6 @@ player_max_hp = 100
 player_level = 1
 player_exp = 0
 
-# ================= Enemy Parameters =====================
-total_enemies_in_wave = 20
-remaining_enemies_to_spawn = total_enemies_in_wave
-max_enemies_on_screen = 10
-current_wave = 1
-max_waves = 10
-enemies = []  # 存放 Enemy 物件
 
 
 # ================= Equipment System =====================
@@ -207,12 +200,14 @@ class Enemy:
         self.set_attributes(etype, wave)
         self.burn_time = 0
         self.last_burn_tick = 0
+
     def set_attributes(self, etype, wave):
         stats = ENEMY_STATS[etype]
         self.speed = stats["speed"] * (0.5 if wave == 1 else 1 + (wave - 1) * 0.1)
         self.size = stats["size"]
         self.color = stats["color"]
         self.hp = self.max_hp = stats["max_hp"]
+
     def move_towards(self, target_x, target_y):
         if target_x > self.x:
             self.x += self.speed
@@ -222,11 +217,13 @@ class Enemy:
             self.y += self.speed
         elif target_y < self.y:
             self.y -= self.speed
+
     def apply_burn(self, current_time):
         if self.burn_time > 0 and current_time - self.last_burn_tick >= 1000:
             self.hp -= 5
             self.burn_time -= 1000
             self.last_burn_tick = current_time
+
     def draw(self, surface):
         rect = pygame.Rect(self.x, self.y, self.size, self.size)
         pygame.draw.rect(surface, self.color, rect)
@@ -235,39 +232,42 @@ class Enemy:
         pygame.draw.rect(surface, GREEN, (self.x, self.y - 10, hp_bar, 5))
 # === End Enemy Management Module ===
 
-# 定義全局敵人管理變數（替換原有敵人參數區段）
+# ================= Enemy Parameters =====================
 total_enemies_in_wave = 20
 remaining_enemies_to_spawn = total_enemies_in_wave
 max_enemies_on_screen = 10
 current_wave = 1
 max_waves = 10
-enemies = []
-# ================= End Enemy Management =====================
+enemies = []  # 存放 Enemy 物件
+
+
+
+# 新增敵人類型對應字典，放在 spawn_enemy() 前面
+wave_enemy_types = {
+    1: ["normal"],
+    3: ["normal", "elite", "swift"],
+    5: ["normal", "elite", "swift", "tank"],
+    7: ["normal", "elite", "swift", "tank", "healer"],
+    9: ["normal", "elite", "swift", "tank", "healer", "bomber", "summoner"]
+}
 
 def spawn_enemy(wave):
-    if wave == max_waves:
-        if not any(enemy.etype == "boss" for enemy in enemies):
-            etype = "boss"
-        else:
-            etype = random.choice(["normal", "elite"])
-    else:
-        if wave >= 6:
-            types = ["normal", "elite", "swift", "tank", "healer", "bomber", "summoner"]
-        elif wave == 5:
-            types = ["normal", "elite", "swift", "tank", "healer", "bomber"]
-        elif wave == 4:
-            types = ["normal", "elite", "swift", "tank", "healer"]
-        elif wave == 3:
-            types = ["normal", "elite", "swift", "tank"]
-        elif wave == 2:
-            types = ["normal", "elite", "swift"]
-        else:
-            types = ["normal", "elite"]
-        etype = random.choice(types)
+    # 根據當前波數從字典中取得敵人類型列表，若沒有直接對應則取最大不超過的鍵
+    types = wave_enemy_types.get(wave)
+    if types is None:
+        keys = sorted(wave_enemy_types.keys())
+        for k in reversed(keys):
+            if wave >= k:
+                types = wave_enemy_types[k]
+                break
+    # 隻在第一關時，types 應為 ["normal"]
+    etype = random.choice(types)
+    # 如果是最終波且還沒有boss，則設定為boss
+    if wave == max_waves and not any(enemy.etype == "boss" for enemy in enemies):
+        etype = "boss"
     x = random.randint(0, WIDTH - 100)
     y = random.randint(0, HEIGHT - 100)
     return Enemy(x, y, etype, wave)
-
 
 
 # ================= Energy Core Timer =====================
@@ -402,16 +402,10 @@ while running:
     
     # Dynamic enemy spawn: if on-screen count below limit and remaining > 0, spawn new enemy
     while len(enemies) < max_enemies_on_screen and remaining_enemies_to_spawn > 0:
-    # 選擇敵人類型，boss 波若尚未出現 boss，則設為 "boss"
-        if current_wave == max_waves and not any(enemy.etype == "boss" for enemy in enemies):
-            etype = "boss"
-        else:
-            etype = "elite" if random.random() < 0.3 else "normal"
-    # 生成隨機位置（注意這裡的範圍可根據你的需求調整，或根據 enemy 的 size 來避免超出畫面）：
-        x = random.randint(0, WIDTH - 100)
-        y = random.randint(0, HEIGHT - 100)
-        enemies.append(Enemy(x, y, etype, current_wave))
+        enemies.append(spawn_enemy(current_wave))
         remaining_enemies_to_spawn -= 1
+
+
 
     
     # Energy Core effect: every 10 sec trigger electric shock (50 dmg within 150px)
