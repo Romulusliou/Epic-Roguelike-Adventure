@@ -178,6 +178,40 @@ def draw_upgrade_overlay(frame_surface):
     screen.blit(frame_surface, (0, 0))
     pygame.display.update()
 
+class Bomb:
+    def __init__(self, x, y, target_x, target_y):
+        self.x = x
+        self.y = y
+        self.target_x = target_x
+        self.target_y = target_y
+        self.speed = 5  
+        self.exploded = False
+        self.explosion_radius = 50  
+        self.damage = 50  
+    
+    def move(self):
+        if not self.exploded:
+            dx = self.target_x - self.x
+            dy = self.target_y - self.y
+            dist = math.hypot(dx, dy)
+            if dist > 0:
+                self.x += (dx / dist) * self.speed
+                self.y += (dy / dist) * self.speed
+
+            if dist < 5:
+                self.explode()
+
+    def explode(self):
+        self.exploded = True
+        for enemy in enemies:  
+            if math.hypot(enemy.x - self.x, enemy.y - self.y) < self.explosion_radius:
+                enemy.hp -= self.damage
+
+    def draw(self, surface):
+        if not self.exploded:
+            pygame.draw.circle(surface, (255, 0, 0), (int(self.x), int(self.y)), 5)
+        else:
+            pygame.draw.circle(surface, (255, 255, 0), (int(self.x), int(self.y)), self.explosion_radius, 2)
 
 
 # === Begin Enemy Management Module ===
@@ -192,6 +226,7 @@ ENEMY_STATS = {
     "boss": {"speed": 1, "size": 40, "color": DARK_RED, "max_hp": 500}
 }
 
+
 class Enemy:
     def __init__(self, x, y, etype, wave):
         self.x = x
@@ -200,6 +235,10 @@ class Enemy:
         self.set_attributes(etype, wave)
         self.burn_time = 0
         self.last_burn_tick = 0
+        self.attack_cooldown = 0  # 攻擊冷卻時間
+        self.summon_cooldown = 0  # 召喚冷卻
+        self.shield = 0  # 坦克用護盾
+        self.direction = random.choice([-1, 1])  # swift Z 字形移動
 
     def set_attributes(self, etype, wave):
         stats = ENEMY_STATS[etype]
@@ -209,6 +248,7 @@ class Enemy:
         self.hp = self.max_hp = stats["max_hp"]
 
     def move_towards(self, target_x, target_y):
+        """基礎移動方式：直線朝向玩家"""
         if target_x > self.x:
             self.x += self.speed
         elif target_x < self.x:
@@ -217,6 +257,55 @@ class Enemy:
             self.y += self.speed
         elif target_y < self.y:
             self.y -= self.speed
+
+    def update_behavior(self, target_x, target_y, enemies):
+        """根據敵人類型執行不同的行為"""
+        if self.etype == "normal":
+            self.move_towards(target_x, target_y)
+
+        elif self.etype == "elite":
+            self.move_towards(target_x, target_y)
+            if self.attack_cooldown <= 0:  # 觸發短暫衝刺
+                self.speed *= 2
+                self.attack_cooldown = 60  # 1 秒後才能再衝刺
+
+        elif self.etype == "swift":
+            self.x += self.direction * self.speed  # Z 字形移動
+            if random.random() < 0.02:  # 偶爾改變方向
+                self.direction *= -1
+            if self.attack_cooldown <= 0 and self.is_near(target_x, target_y, 50):
+                self.speed *= 3  # 瞬間加速
+                self.attack_cooldown = 80
+
+        elif self.etype == "tank":
+            self.move_towards(target_x, target_y)
+            if pygame.time.get_ticks() % 5000 < 100:  # 每 5 秒獲得護盾
+                self.shield = 1
+
+        elif self.etype == "healer":
+            self.x += random.uniform(-1, 1) * self.speed  # 避免站在原地
+            self.y += random.uniform(-1, 1) * self.speed
+            self.heal_allies(enemies)
+
+        elif self.etype == "bomber":
+            if self.attack_cooldown <= 0:
+                self.throw_bomb(target_x, target_y)
+                self.attack_cooldown = 120  # 投擲冷卻時間
+
+        elif self.etype == "summoner":
+            if self.summon_cooldown <= 0:
+                self.summon_enemy()
+                self.summon_cooldown = 200
+            if self.hp < self.max_hp * 0.5:
+                self.x += (self.x - target_x) * 0.1  # 逃跑
+
+        elif self.etype == "boss":
+            if random.random() < 0.5:
+                self.throw_bomb(target_x, target_y)
+            if random.random() < 0.3:
+                self.summon_enemy()
+            if random.random() < 0.2:
+                self.speed *= 2  # 偶爾衝刺
 
     def apply_burn(self, current_time):
         if self.burn_time > 0 and current_time - self.last_burn_tick >= 1000:
@@ -230,6 +319,25 @@ class Enemy:
         pygame.draw.rect(surface, BLACK, (self.x, self.y - 10, self.size, 5))
         hp_bar = self.size * (self.hp / self.max_hp) if self.max_hp else 0
         pygame.draw.rect(surface, GREEN, (self.x, self.y - 10, hp_bar, 5))
+
+    def is_near(self, target_x, target_y, radius):
+        return math.sqrt((self.x - target_x) ** 2 + (self.y - target_y) ** 2) < radius
+
+    def throw_bomb(self, target_x, target_y):
+        """炸彈客與 Boss 投擲爆炸物"""
+        bomb = Bomb(self.x, self.y, target_x, target_y)
+        bombs.append(bomb)
+
+    def summon_enemy(self):
+        """召喚師與 Boss 召喚小怪"""
+        new_enemy = Enemy(self.x + random.randint(-30, 30), self.y + random.randint(-30, 30), "normal", 1)
+        enemies.append(new_enemy)
+
+    def heal_allies(self, enemies):
+        """治療者治療附近敵人"""
+        for enemy in enemies:
+            if enemy != self and self.is_near(enemy.x, enemy.y, 100):
+                enemy.hp = min(enemy.max_hp, enemy.hp + 10)
 # === End Enemy Management Module ===
 
 # ================= Enemy Parameters =====================
@@ -239,6 +347,8 @@ max_enemies_on_screen = 10
 current_wave = 1
 max_waves = 10
 enemies = []  # 存放 Enemy 物件
+
+bombs = [] # 存放敵人投擲的炸彈
 
 
 
@@ -405,20 +515,31 @@ while running:
         enemies.append(spawn_enemy(current_wave))
         remaining_enemies_to_spawn -= 1
 
+    # *** 插入炸彈更新和繪製代碼 ***
+    for bomb in bombs:
+        bomb.move()  # 更新炸彈位置
+        if bomb.should_be_removed(): # 檢查炸彈是否需要被移除
+          bombs.remove(bomb) # 從列表中移除炸彈
+          continue # 繼續下一個炸彈的處理
 
+        bomb.draw(frame_surface) # 在 frame_surface 上繪製炸彈
 
-    
     # Energy Core effect: every 10 sec trigger electric shock (50 dmg within 150px)
     if any(e["name"] == "Energy Core" for e in player_equipment):
         if current_time - last_elec_time >= 10000:
             last_elec_time = current_time
-            player_center = (player_x+player_size/2, player_y+player_size/2)
+            player_center = (player_x + player_size / 2, player_y + player_size / 2)
             for enemy in enemies:
                 ex, ey = enemy.x, enemy.y
-                enemy_center = (ex+enemy.size/2, ey+enemy.size/2)
-                if math.hypot(enemy_center[0]-player_center[0], enemy_center[1]-player_center[1]) < 150:
+                enemy_center = (ex + enemy.size / 2, ey + enemy.size / 2)
+
+                # 更新敵人的行為模式
+                enemy.update_behavior(player_x, player_y, enemies)
+                # 判斷是否觸發電擊
+                if math.hypot(enemy_center[0] - player_center[0], enemy_center[1] - player_center[1]) < 150:
                     enemy.hp -= 50
                     add_floating_text("⚡ Electric Shock!", enemy_center, 1000)
+
     
     # ---------- Event Handling ----------
     for event in pygame.event.get():
@@ -743,8 +864,11 @@ while running:
             remaining_enemies_to_spawn = total_enemies_in_wave
             enemies = []
             player_equipment = []
+            weapons = {"sword": True, "bullet": False}
+            sword_advanced = False
         else:
             pygame.quit(); sys.exit()
+
 
 pygame.display.update()
 pygame.quit()
