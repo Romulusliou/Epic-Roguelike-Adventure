@@ -2,26 +2,76 @@ import pygame
 import random
 import sys
 import math
+import os
+import keyboard #  <--- 導入 keyboard 函式庫
+import sys, time, random, math
 
 # ================= Initialization =====================
+
 pygame.init()
 
-# Set resolution to 1920x1080
-WIDTH, HEIGHT = 1920, 1080
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Epic Roguelike Adventure")
+# ✅ 自適應螢幕解析度（自動適應全螢幕）
+infoObject = pygame.display.Info()
+WIDTH, HEIGHT = infoObject.current_w, infoObject.current_h
+screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN)
+pygame.display.set_caption("穿越成為成最強冒險家")
 
-# Load fonts
+# ✅ 確保使用中文字型
+# 🔥 自動切換到遊戲的實際目錄
+os.chdir(os.path.dirname(os.path.abspath(__file__)))
+font_path = os.path.join("fonts", "NotoSansTC-VariableFont_wght.ttf")  # 使用普通版字型
 try:
-    font = pygame.font.Font("mingliu.ttc", 40)
-except:
-    font = pygame.font.SysFont("arial", 40)
+    font = pygame.font.Font(font_path, 40)
+except Exception as e:
+    print(f"❌ 字型載入失敗: {e}")
+    try:
+        font = pygame.font.Font("msjh.ttc", 40)  # 微軟正黑體
+    except Exception as e:
+        print(f"❌ 微軟正黑體載入失敗: {e}")
+        font = pygame.font.SysFont("arial", 40)  # 備用
+
+# ✅ Emoji 字型處理（避免顯示錯誤）
 try:
-    equip_font = pygame.font.Font("seguiemj.ttf", 30)  # Font that supports emoji
+    equip_font = pygame.font.Font("seguiemj.ttf", 30)  # 支援 Emoji 的字型
 except:
     print("Warning: Emoji font not found. Emoji may not display correctly.")
     equip_font = pygame.font.SysFont("arial", 30)
+
+# 顯示升級選單的字型
 upgrade_font = pygame.font.SysFont("arial", 30)
+
+
+user_input = ""  # 儲存玩家輸入的文字
+
+for event in pygame.event.get():
+    if event.type == pygame.QUIT:
+        running = False
+
+    elif event.type == pygame.KEYDOWN:
+        print(f"[DEBUG] KEYDOWN: {event.key}")  # 顯示按鍵代碼
+
+        if event.key == pygame.K_RETURN:  # 按 Enter 確認輸入
+            print(f"[DEBUG] 玩家輸入完成: {user_input}")
+            user_input = ""  # 清空輸入框
+
+        elif event.key == pygame.K_BACKSPACE:  # 退格刪除字元
+            user_input = user_input[:-1]
+            print(f"[DEBUG] 玩家刪除字元，剩餘輸入: {user_input}")
+
+        elif event.key == pygame.K_SPACE:  # 空白鍵
+            print("[DEBUG] 按下空白鍵")
+            user_input += " "  # 加入空格
+
+        else:
+            try:
+                char = event.unicode  # 嘗試取得按鍵對應的文字
+                print(f"[DEBUG] 玩家輸入: {char}")
+                user_input += char
+            except:
+                print("[DEBUG] 無法解析此鍵")
+ 
+
+
 
 # ================= Color Definitions ====================
 WHITE    = (255, 255, 255)
@@ -423,7 +473,7 @@ def start_screen():
     while waiting:
         frame = pygame.Surface((WIDTH, HEIGHT))
         frame.fill(WHITE)
-        title_text = font.render("Epic Roguelike Adventure", True, BLACK)
+        title_text = font.render("穿越成為成最強冒險家", True, BLACK)
         prompt_text = font.render("Press ENTER to Start", True, BLACK)
         frame.blit(title_text, (WIDTH//2 - title_text.get_width()//2, HEIGHT//2 - title_text.get_height() - 20))
         frame.blit(prompt_text, (WIDTH//2 - prompt_text.get_width()//2, HEIGHT//2 + 20))
@@ -545,32 +595,36 @@ while running:
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit(); sys.exit()
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_SPACE:
-                # Trigger sword attack if available
-                if weapons["sword"] and not sword_swinging:
-                    sword_swinging = True
-                    sword_swing_start = current_time
-                    sword_hit_list = []
-                # Trigger bullet attack if available
-                if weapons["bullet"]:
-                    if current_time - last_bullet_time > bullet_cooldown:
-                        last_bullet_time = current_time
-                        muzzle_flash_time = current_time + muzzle_flash_duration
-                        player_center = (player_x+player_size/2, player_y+player_size/2)
-                        index, target_center = get_nearest_enemy(player_center)
-                        if target_center is not None:
-                            dx = target_center[0]-player_center[0]
-                            dy = target_center[1]-player_center[1]
-                            primary_angle = math.atan2(dy, dx)
-                        else:
-                            primary_angle = math.atan2(last_dir[1], last_dir[0])
-                        for i in range(bullet_count):
-                            offset = random.uniform(-bullet_spread/2, bullet_spread/2)
-                            angle = primary_angle + offset
-                            direction = (math.cos(angle), math.sin(angle))
-                            bullet = {"x": player_center[0], "y": player_center[1], "dir": direction}
-                            bullets.append(bullet)
+
+
+    # ---------- 使用 keyboard 函式庫 偵測空白鍵 ----------
+    if keyboard.is_pressed("space"): #  <--- 使用 keyboard.is_pressed() 偵測空白鍵
+        print("[DEBUG] 按下空白鍵 (keyboard 函式庫)") # 新增除錯訊息 (keyboard 函式庫)
+        # Trigger sword attack if available
+        if weapons["sword"] and not sword_swinging:
+            sword_swinging = True
+            sword_swing_start = current_time
+            sword_hit_list = []
+        # Trigger bullet attack if available
+        if weapons["bullet"]:
+            if current_time - last_bullet_time > bullet_cooldown:
+                last_bullet_time = current_time
+                muzzle_flash_time = current_time + muzzle_flash_duration
+                player_center = (player_x+player_size/2, player_y+player_size/2)
+                index, target_center = get_nearest_enemy(player_center)
+                if target_center is not None:
+                    dx = target_center[0]-player_center[0]
+                    dy = target_center[1]-player_center[1]
+                    primary_angle = math.atan2(dy, dx)
+                else:
+                    primary_angle = math.atan2(last_dir[1], last_dir[0]) 
+                for i in range(bullet_count):
+                    offset = random.uniform(-bullet_spread/2, bullet_spread/2)
+                    angle = primary_angle + offset
+                    direction = (math.cos(angle), math.sin(angle))
+                    bullet = {"x": player_center[0], "y": player_center[1], "dir": direction}
+                    bullets.append(bullet)
+            
     
     # ---------- Player Movement & Direction ----------
     keys = pygame.key.get_pressed()
@@ -587,6 +641,37 @@ while running:
         player_y -= base_player_speed
     if keys[pygame.K_DOWN]:
         player_y += base_player_speed
+
+    # *** 使用 pygame.key.get_pressed() 偵測空白鍵狀態 ***
+    keys = pygame.key.get_pressed()
+    if keys[pygame.K_SPACE]:
+        print("[DEBUG] 按下空白鍵 (get_pressed)") # 新增 get_pressed 除錯訊息
+        # Trigger sword attack if available
+        if weapons["sword"] and not sword_swinging:
+            sword_swinging = True
+            sword_swing_start = current_time
+            sword_hit_list = []
+        # Trigger bullet attack if available
+        if weapons["bullet"]:
+            if current_time - last_bullet_time > bullet_cooldown:
+                last_bullet_time = current_time
+                muzzle_flash_time = current_time + muzzle_flash_duration
+                player_center = (player_x+player_size/2, player_y+player_size/2)
+                index, target_center = get_nearest_enemy(player_center)
+                if target_center is not None:
+                    dx = target_center[0]-player_center[0]
+                    dy = target_center[1]-player_center[1]
+                    primary_angle = math.atan2(dy, dx)
+                else:
+                    primary_angle = math.atan2(last_dir[1], last_dir[0])
+                for i in range(bullet_count):
+                    offset = random.uniform(-bullet_spread/2, bullet_spread/2)
+                    angle = primary_angle + offset
+                    direction = (math.cos(angle), math.sin(angle))
+                    bullet = {"x": player_center[0], "y": player_center[1], "dir": direction}
+                    bullets.append(bullet)
+
+
     # Wind Boots: Increase speed by 15%
     if any(e["name"] == "Wind Boots" for e in player_equipment):
         player_speed = base_player_speed * 1.15
@@ -835,14 +920,19 @@ while running:
                 if event.type == pygame.QUIT:
                     pygame.quit(); sys.exit()
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_1:
+                    print(f"[DEBUG - 升級選單] KEYDOWN event: {event}") 
+                    print(f"[DEBUG - 升級選單] 所有按鍵 Scancode: {event.scancode}")
+                    if keyboard.is_pressed("1"): # 偵測數字鍵 1
+                        print("======== [DEBUG - 升級選單] 進入數字鍵 1 (keyboard 偵測) 判斷分支 ========") # <---  更明確的進入分支除錯訊息
                         player_max_hp += 20
                         player_hp = player_max_hp
                         upgrade_done = True
-                    elif event.key == pygame.K_2:
+                    elif keyboard.is_pressed("2"):
+                        print(f"[DEBUG - 升級選單] 按下數字鍵 2 (K_2 分支)")
                         attack_damage += 5
                         upgrade_done = True
-                    elif event.key == pygame.K_3 and player_level >= 3:
+                    elif keyboard.is_pressed("3") and player_level >= 3:
+                        print("[DEBUG - 升級選單] 按下數字鍵 3") 
                         weapons["bullet"] = True
                         upgrade_done = True
         is_upgrading = False
