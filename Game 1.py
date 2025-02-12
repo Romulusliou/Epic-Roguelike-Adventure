@@ -38,10 +38,13 @@ except:
     equip_font = pygame.font.SysFont("arial", 30)
 
 # 顯示升級選單的字型
-upgrade_font = pygame.font.SysFont("arial", 30)
+upgrade_font = pygame.font.Font(font_path, 30) #  <<<===  修改: 使用 font_path 變數載入字型檔案
+upgrade_font_small = pygame.font.Font(font_path, 24) #  <<<===  修改: 使用 font_path 變數載入字型檔案
 
 
 user_input = ""  # 儲存玩家輸入的文字
+
+game_state = "playing"  # 可用值："playing"（遊戲中）、"paused"（暫停中）、"menu"（主選單）
 
 for event in pygame.event.get():
     if event.type == pygame.QUIT:
@@ -59,7 +62,6 @@ for event in pygame.event.get():
             print(f"[DEBUG] 玩家刪除字元，剩餘輸入: {user_input}")
 
         elif event.key == pygame.K_SPACE:  # 空白鍵
-            print("[DEBUG] 按下空白鍵")
             user_input += " "  # 加入空格
 
         else:
@@ -69,19 +71,74 @@ for event in pygame.event.get():
                 user_input += char
             except:
                 print("[DEBUG] 無法解析此鍵")
- 
+
+    # 遊戲進行中
+    if game_state == "playing":
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                game_state = "paused"  # 按下 ESC 進入暫停狀態
+            # 其他遊戲進行中的按鍵處理...
+    
+    # 暫停狀態下，處理暫停選單事件
+    elif game_state == "paused":
+        if event.type == pygame.KEYDOWN:
+            # 你可以讓 ESC 再次切換回遊戲，或者僅靠滑鼠點擊選單選項
+            if event.key == pygame.K_ESCAPE:
+                game_state = "playing"
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            # 假設「回到首頁」選項在畫面中的某個區域，這裡用範例座標判斷
+            if (WIDTH // 2 - 100 <= mouse_x <= WIDTH // 2 + 100) and (HEIGHT // 2 + 70 <= mouse_y <= HEIGHT // 2 + 130):
+                game_state = "menu"  # 切換到主選單狀態
+            # 也可以在這裡加入「繼續遊戲」和「設定」的點擊處理
+
+    # 主選單狀態下，處理按鍵或滑鼠來選擇開始遊戲等功能
+    elif game_state == "menu":
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_RETURN:
+                game_state = "playing"  # 按 Enter 開始遊戲（或重新開始）
 
 
 
-# ================= Color Definitions ====================
-WHITE    = (255, 255, 255)
-RED      = (255, 0, 0)
-GREEN    = (0, 255, 0)
-BLUE     = (0, 0, 255)
-BLACK    = (0, 0, 0)
-ORANGE   = (255, 165, 0)
-PURPLE   = (128, 0, 128)    # Elite enemy
-DARK_RED = (139, 0, 0)      # Boss
+
+
+
+
+# ==================== 顏色定義 ====================
+BLACK = (0, 0, 0)
+WHITE = (255, 255, 255)
+GREEN = (0, 255, 0)
+ORANGE = (255, 165, 0)
+BLUE = (0, 0, 255)
+YELLOW = (255, 255, 0)
+CYAN = (0, 255, 255)
+RED = (255, 0, 0)
+PINK = (255, 192, 203)
+BROWN = (139, 69, 19)
+LIGHT_GREEN = (144, 238, 144)
+LIGHT_YELLOW = (255, 255, 224)
+LIGHT_BLUE = (173, 216, 230)
+LIGHT_CYAN = (224, 255, 255)
+PURPLE = (128, 0, 128)
+DARK_RED = (139, 0, 0)
+
+
+COLOR_DICT = { #  定義 COLOR_DICT 字典 (請放在顏色常數定義 *下方*)
+    "BLACK": BLACK,
+    "GREEN": GREEN,
+    "ORANGE": ORANGE,
+    "BLUE": BLUE,
+    "YELLOW": YELLOW,
+    "CYAN": CYAN,
+    "RED": RED,
+    "PINK": PINK,
+    "BROWN": BROWN,
+    "LIGHT_GREEN": LIGHT_GREEN,
+    "LIGHT_YELLOW": LIGHT_YELLOW,
+    "LIGHT_BLUE": LIGHT_BLUE,
+    "LIGHT_CYAN": LIGHT_CYAN,
+    # ... 可以根據需要繼續擴充 ...
+}
 
 # ================= Floating Text System =====================
 floating_texts = []  # Each: {"text": str, "pos": (x,y), "timer": ms}
@@ -117,6 +174,102 @@ player_hp = 100
 player_max_hp = 100
 player_level = 1
 player_exp = 0
+player_hp_regen = 0      #  新增：生命回復速度
+player_crit_rate = 0.0   #  新增：暴擊率 (0.0 ~ 1.0)
+player_dodge_rate = 0.0  #  新增：閃避率 (0.0 ~ 1.0)
+
+
+upgrade_options_data = [ #  <<<=== 將 upgrade_options_data 放在這裡 (或其他全局變數定義區)
+    # ---------- 基礎素質升級 ----------
+    {
+        "type": "stat",
+        "subtype": "hp",
+        "name": "強化生命值",
+        "description": "永久增加 20 點生命值上限，提升生存能力。",
+        "effect": "player_max_hp += 20",
+        "level_required": 1,
+        "display_color": "GREEN", #  新增：選項框顏色
+        "key_binding": "1",      #  新增：綁定按鍵 (預設使用數字鍵 1, 2, 3)
+    },
+    
+    # ---------- 基礎素質升級 ----------
+    {
+        "type": "stat",
+        "subtype": "hp",
+        "name": "強化生命值",
+        "description": "永久增加 20 點生命值上限，提升生存能力。",
+        "effect": "player_max_hp += 20",
+        "level_required": 1,
+        "display_color": "GREEN", #  新增：選項框顏色
+        "key_binding": "1",      #  新增：綁定按鍵 (預設使用數字鍵 1, 2, 3)
+    },
+    {
+        "type": "stat",
+        "subtype": "attack",
+        "name": "強化攻擊力",
+        "description": "永久增加 5 點基礎攻擊力，提升傷害輸出。",
+        "effect": "attack_damage += 5",
+        "level_required": 1,
+        "display_color": "ORANGE", # 新增：選項框顏色
+        "key_binding": "2",      # 新增：綁定按鍵
+    },
+    {
+        "type": "stat",
+        "subtype": "speed",
+        "name": "強化移動速度",
+        "description": "永久提升 10% 移動速度，更加靈活。", # 修改為百分比提升更直觀
+        "effect": "player_speed *= 1.1", #  使用乘法提升百分比
+        "level_required": 2,      #  移動速度提升可以設定等級 2 解鎖
+        "display_color": "YELLOW", # 新增：選項框顏色
+        "key_binding": "3",      # 新增：綁定按鍵
+    },
+    {
+        "type": "stat",
+        "subtype": "hp_regen",
+        "name": "強化生命回復",
+        "description": "永久提升 1 點/秒 生命回復速度，增強續戰力。",
+        "effect": "player_hp_regen += 1",
+        "level_required": 3,      # 生命回復可以設定等級 3 解鎖
+        "display_color": "CYAN",   # 新增：選項框顏色
+        "key_binding": "4",      # 新增：綁定按鍵 (後續選項使用數字鍵 4, 5, 6...)
+    },
+    {
+        "type": "stat",
+        "subtype": "crit_rate",
+        "name": "強化暴擊率",
+        "description": "永久提升 5% 暴擊率，造成更高爆發傷害。", # 修改為百分比提升更直觀
+        "effect": "player_crit_rate += 0.05", #  使用浮點數表示百分比
+        "level_required": 4,      # 暴擊率可以設定等級 4 解鎖
+        "display_color": "RED",    # 新增：選項框顏色
+        "key_binding": "5",      # 新增：綁定按鍵
+    },
+    {
+        "type": "stat",
+        "subtype": "dodge_rate",
+        "name": "強化閃避率",
+        "description": "永久提升 2% 閃避率，更不容易受到傷害。", # 修改為百分比提升更直觀
+        "effect": "player_dodge_rate += 0.02", # 使用浮點數表示百分比
+        "level_required": 5,      # 閃避率可以設定等級 5 解鎖
+        "display_color": "PINK",   # 新增：選項框顏色
+        "key_binding": "6",      # 新增：綁定按鍵
+    },
+
+    # ---------- 新增武器 ----------
+    {
+        "type": "bullet",
+        "subtype": "gun",
+        "name": "解鎖基礎槍",
+        "description": "獲得基礎槍，遠程攻擊能力UP！",
+        "effect": "weapons['bullet'] = True",
+        "level_required": 1,
+        "display_color": "BLUE",   # 新增：選項框顏色
+        "key_binding": "7",      # 新增：綁定按鍵
+    },
+    #                  
+
+    # ... 可以繼續擴充更多升級選項 ...
+]
+
 
 
 
@@ -149,6 +302,8 @@ sword_duration = 300  # ms
 sword_range = 80      # Final attack radius
 sword_fan_angle = math.radians(60)  # Final sector angle (60°)
 sword_hit_list = []
+刀_範圍 = sword_range #  範例: 使用 刀_範圍 變數控制刀的範圍 (請根據您的實際程式碼調整變數名稱)
+刀_攻擊速度 = 1      #  範例: 使用 刀_攻擊速度 控制刀的攻擊速度 (數值越大速度越慢，數值越小速度越快，預設值為 1)
 
 # --- Bullet Parameters (Gun) ---
 bullets = []  # Each bullet: {"x", "y", "dir": (dx,dy)}
@@ -158,6 +313,8 @@ bullet_speed = 10
 bullet_count = 3  # Number of bullets fired at once
 bullet_spread = math.radians(30)  # Spread angle of 30°
 last_dir = (0, -1)
+槍_子彈數量 = bullet_count # 範例: 使用 槍_子彈數量 變數控制子彈數量
+槍_射擊間隔 = bullet_cooldown / 1000 # 範例: 使用 槍_射擊間隔 控制射速 (單位: 秒) (預設值為 bullet_cooldown/1000)
 
 def melee_attack():
     """執行近戰攻擊（劍），檢測範圍內的敵人並造成傷害。"""
@@ -189,42 +346,42 @@ def handle_attacks():
         ranged_attack()
 
 # ================= upgrade system =====================
-def draw_upgrade_overlay(frame_surface):
+def draw_upgrade_overlay(frame_surface, upgrade_options, player_level): # 修改: 接收 upgrade_options 和 player_level
     # 在已有戰鬥畫面上疊加半透明濾鏡
     overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
     overlay.fill((255, 255, 255, 0))
     frame_surface.blit(overlay, (0, 0))
-    
+
     box_width, box_height = 300, 200
     spacing = 50
-    total_width = 3 * box_width + 2 * spacing
+    total_width = len(upgrade_options) * box_width + (len(upgrade_options) - 1) * spacing # 修改: 根據選項數量計算總寬度
     start_x = (WIDTH - total_width) // 2
     start_y = (HEIGHT - box_height) // 2
 
-    box1 = pygame.Rect(start_x, start_y, box_width, box_height)
-    pygame.draw.rect(frame_surface, BLACK, box1, 2)
-    pygame.draw.rect(frame_surface, GREEN, (box1.x + 20, box1.y + 20, box_width - 40, box_height - 80))
-    txt1 = upgrade_font.render("Increase HP +20", True, BLACK)
-    frame_surface.blit(txt1, (box1.x + 20, box1.y + box_height - 50))
+    for i, option in enumerate(upgrade_options): # 修改: 迴圈處理升級選項
+        box_x = start_x + i * (box_width + spacing)
+        box_rect = pygame.Rect(box_x, start_y, box_width, box_height)
+        pygame.draw.rect(frame_surface, BLACK, box_rect, 2)
 
-    box2 = pygame.Rect(start_x + box_width + spacing, start_y, box_width, box_height)
-    pygame.draw.rect(frame_surface, BLACK, box2, 2)
-    pygame.draw.rect(frame_surface, ORANGE, (box2.x + 20, box2.y + 20, box_width - 40, box_height - 80))
-    txt2 = upgrade_font.render("Increase Attack +5", True, BLACK)
-    frame_surface.blit(txt2, (box2.x + 20, box2.y + box_height - 50))
+        # 根據 upgrade_options_data 中的 display_color 決定方框顏色
+        box_color_name = option.get("display_color", "GREEN") # 預設顏色為 GREEN
+        box_color = COLOR_DICT.get(box_color_name, GREEN) # 使用 COLOR_DICT 取得顏色值，預設為 GREEN
+        pygame.draw.rect(frame_surface, box_color, (box_rect.x + 20, box_rect.y + 20, box_width - 40, box_height - 80))
 
-    box3 = pygame.Rect(start_x + 2 * (box_width + spacing), start_y, box_width, box_height)
-    pygame.draw.rect(frame_surface, BLACK, box3, 2)
-    if player_level >= 3:
-        pygame.draw.rect(frame_surface, BLUE, (box3.x + 20, box3.y + 20, box_width - 40, box_height - 80))
-        txt3 = upgrade_font.render("Acquire Gun", True, BLACK)
-    else:
-        pygame.draw.rect(frame_surface, (200, 200, 200), (box3.x + 20, box3.y + 20, box_width - 40, box_height - 80))
-        txt3 = upgrade_font.render("(Locked)", True, BLACK)
-    frame_surface.blit(txt3, (box3.x + 20, box3.y + box_height - 50))
+        txt_option_name = upgrade_font.render(option["name"], True, BLACK) # 使用選項名稱
+        frame_surface.blit(txt_option_name, (box_rect.x + 20, box_rect.y + box_height - 100)) # 調整位置
 
-    prompt = upgrade_font.render("Choose upgrade (Press 1, 2, or 3)", True, BLACK)
-    frame_surface.blit(prompt, (WIDTH//2 - prompt.get_width()//2, start_y + box_height + 20))
+        txt_description = upgrade_font_small.render(option["description"], True, BLACK) # 使用選項描述
+        frame_surface.blit(txt_description, (box_rect.x + 20, box_rect.y + box_height - 60)) # 調整位置
+
+        # 顯示按鍵提示 (例如 "Press 1", "Press 2", "Press Q" etc.)，使用 key_binding 屬性
+        key_prompt_text = f"Press {option['key_binding']}"
+        key_prompt = upgrade_font.render(key_prompt_text, True, BLACK)
+        frame_surface.blit(key_prompt, (box_rect.x + 20, box_rect.y + box_height - 30)) # 調整位置
+
+
+    prompt = upgrade_font.render("Choose upgrade", True, BLACK) # 提示文字簡化
+    frame_surface.blit(prompt, (WIDTH // 2 - prompt.get_width() // 2, start_y + box_height + 20))
     screen.blit(frame_surface, (0, 0))
     pygame.display.update()
 
@@ -262,6 +419,13 @@ class Bomb:
             pygame.draw.circle(surface, (255, 0, 0), (int(self.x), int(self.y)), 5)
         else:
             pygame.draw.circle(surface, (255, 255, 0), (int(self.x), int(self.y)), self.explosion_radius, 2)
+
+    def should_be_removed(self): #  <<<===  新增 should_be_removed(self) 方法
+        # 判斷炸彈是否應該被移除的邏輯
+        if self.exploded: #  如果炸彈已經爆炸 (self.exploded 為 True)
+            return True #  返回 True，表示應該被移除
+        else: #  否則 (炸彈還沒爆炸)
+            return False #  返回 False，表示不應該被移除
 
 
 # === Begin Enemy Management Module ===
@@ -545,6 +709,35 @@ def draw_equipment_panel(surface, player_equipment, equipment_icons, equipment_d
         surface.blit(txt_icon, (panel_x + 10, panel_y + 10 + i * 50))
         surface.blit(txt_desc, (panel_x + 50, panel_y + 10 + i * 50))
 
+def draw_pause_menu(screen):
+    """繪製暫停選單"""
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((0, 0, 0, 180))  # 半透明黑色背景
+    screen.blit(overlay, (0, 0))
+
+    font = pygame.font.Font(font_path, 50)  # 使用指定的中文字型
+    options = ["繼續遊戲", "設定", "回到首頁"]
+    option_y = HEIGHT // 2 - 50
+
+    for option in options:
+        text_surface = font.render(option, True, (255, 255, 255))
+        text_rect = text_surface.get_rect(center=(WIDTH // 2, option_y))
+        screen.blit(text_surface, text_rect)
+        option_y += 60
+
+def draw_main_menu(screen):
+    overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+    overlay.fill((50, 50, 50, 255))
+    title = upgrade_font.render("主選單", True, (255, 255, 255))
+    overlay.blit(title, (WIDTH // 2 - title.get_width() // 2, HEIGHT // 2 - 100))
+    option = upgrade_font.render("按 Enter 開始遊戲", True, (255, 255, 255))
+    overlay.blit(option, (WIDTH // 2 - option.get_width() // 2, HEIGHT // 2))
+    screen.blit(overlay, (0, 0))
+    pygame.display.flip()
+
+
+
+
 is_upgrading = False  # 是否進入升級狀態
 upgrade_done = False  # 升級選項是否選擇完成
 
@@ -594,12 +787,41 @@ while running:
     # ---------- Event Handling ----------
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
-            pygame.quit(); sys.exit()
+            pygame.quit()
+            sys.exit()
+
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                if game_state == "playing":
+                    game_state = "paused"
+                elif game_state == "paused":
+                    game_state = "playing"
+
+        # 如果處於暫停狀態，處理選單點擊
+        elif game_state == "paused" and event.type == pygame.MOUSEBUTTONDOWN:
+            mouse_x, mouse_y = pygame.mouse.get_pos()
+            if HEIGHT // 2 - 50 <= mouse_y <= HEIGHT // 2 + 10:
+                game_state = "playing"  # 點擊「繼續遊戲」
+            elif HEIGHT // 2 + 10 <= mouse_y <= HEIGHT // 2 + 70:
+                print("⚙️ [DEBUG] 設定功能尚未實作")  # 點擊「設定」
+            elif HEIGHT // 2 + 70 <= mouse_y <= HEIGHT // 2 + 130:
+                game_state = "menu"  # 點擊「回到首頁」
+
+    # ---------- 主遊戲迴圈 ----------
+    if game_state == "paused":
+        draw_pause_menu(screen)  # 自定義的暫停選單函數
+        pygame.display.flip()
+        continue  # 暫停時不更新其他遊戲邏輯
+
+    if game_state == "menu":
+        draw_main_menu(screen)
+        continue  # 當處於主選單狀態時，暫停其他遊戲邏輯
+
+
 
 
     # ---------- 使用 keyboard 函式庫 偵測空白鍵 ----------
     if keyboard.is_pressed("space"): #  <--- 使用 keyboard.is_pressed() 偵測空白鍵
-        print("[DEBUG] 按下空白鍵 (keyboard 函式庫)") # 新增除錯訊息 (keyboard 函式庫)
         # Trigger sword attack if available
         if weapons["sword"] and not sword_swinging:
             sword_swinging = True
@@ -645,7 +867,6 @@ while running:
     # *** 使用 pygame.key.get_pressed() 偵測空白鍵狀態 ***
     keys = pygame.key.get_pressed()
     if keys[pygame.K_SPACE]:
-        print("[DEBUG] 按下空白鍵 (get_pressed)") # 新增 get_pressed 除錯訊息
         # Trigger sword attack if available
         if weapons["sword"] and not sword_swinging:
             sword_swinging = True
@@ -913,31 +1134,43 @@ while running:
         player_exp = 0
         is_upgrading = True
         upgrade_done = False
-        # 保留當前戰鬥畫面在 frame_surface 中（假設它已經包含所有戰鬥元素）\n
+
+        # ----- 篩選可用的升級選項 -----
+        available_upgrades = [ #  使用列表推導式，篩選出符合等級需求的升級選項
+            option for option in upgrade_options_data if player_level >= option["level_required"]
+        ]
+
+        # ----- 限制升級選項數量 (例如最多顯示 3 個) -----
+        import random #  如果使用 random.sample，需要 import random
+        if len(available_upgrades) > 3:
+            upgrade_choices = random.sample(available_upgrades, 3) #  從可用選項中隨機挑選 3 個
+        else:
+            upgrade_choices = available_upgrades #  如果可用選項少於 3 個，則全部顯示
+
+        # 保留當前戰鬥畫面在 frame_surface 中（假設它已經包含所有戰鬥元素）
         while not upgrade_done:
-            draw_upgrade_overlay(frame_surface)
+            draw_upgrade_overlay(frame_surface, upgrade_choices, player_level) # 修改: 傳入 upgrade_choices 和 player_level
+
+            # Pygame 事件迴圈，*只處理 QUIT 事件*
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    pygame.quit(); sys.exit()
-                if event.type == pygame.KEYDOWN:
-                    print(f"[DEBUG - 升級選單] KEYDOWN event: {event}") 
-                    print(f"[DEBUG - 升級選單] 所有按鍵 Scancode: {event.scancode}")
-                    if keyboard.is_pressed("1"): # 偵測數字鍵 1
-                        print("======== [DEBUG - 升級選單] 進入數字鍵 1 (keyboard 偵測) 判斷分支 ========") # <---  更明確的進入分支除錯訊息
-                        player_max_hp += 20
-                        player_hp = player_max_hp
-                        upgrade_done = True
-                    elif keyboard.is_pressed("2"):
-                        print(f"[DEBUG - 升級選單] 按下數字鍵 2 (K_2 分支)")
-                        attack_damage += 5
-                        upgrade_done = True
-                    elif keyboard.is_pressed("3") and player_level >= 3:
-                        print("[DEBUG - 升級選單] 按下數字鍵 3") 
-                        weapons["bullet"] = True
-                        upgrade_done = True
+                            pygame.quit(); sys.exit()
+
+            # *** 使用 keyboard 函式庫 *直接偵測* 按鍵，並根據 upgrade_choices 判斷選項 ***
+                for option in upgrade_choices: # 迴圈檢查每個升級選項
+                    key = option["key_binding"] # 取得選項綁定的按鍵
+                    if keyboard.is_pressed(key): # 偵測按鍵是否被按下
+                        print(f"[DEBUG - 升級選單] 按下按鍵 {key}，選擇升級：{option['name']}") # 除錯訊息
+
+                        # ----- 套用升級效果 -----
+                        effect_code = option["effect"] # 取得升級效果程式碼字串
+                        exec(effect_code) #  執行升級效果程式碼 (!!!  請務必仔細檢查 effect_code 的安全性 !!! )
+
+                        upgrade_done = True # 完成升級選擇
+
+
         is_upgrading = False
         player_level += 1
-
 
 
 
