@@ -6,40 +6,22 @@ import os
 import keyboard #  <--- 導入 keyboard 函式庫
 import sys, time, random, math
 
-# ================= Initialization =====================
+# It is expected that main.py (or equivalent) will call settings.init_settings()
+# and pass the returned dictionary to the game logic.
+# For now, we'll assume these variables will be provided by such a call.
+# screen, WIDTH, HEIGHT, fonts, colors etc. will be obtained from the settings dict.
 
-pygame.init()
-
-# ✅ 自適應螢幕解析度（自動適應全螢幕）
-infoObject = pygame.display.Info()
-WIDTH, HEIGHT = infoObject.current_w, infoObject.current_h
-screen = pygame.display.set_mode((WIDTH, HEIGHT), pygame.FULLSCREEN)
-pygame.display.set_caption("穿越成為成最強冒險家")
-
-# ✅ 確保使用中文字型
-# 🔥 自動切換到遊戲的實際目錄
-os.chdir(os.path.dirname(os.path.abspath(__file__)))
-font_path = os.path.join("fonts", "NotoSansTC-VariableFont_wght.ttf")  # 使用普通版字型
-try:
-    font = pygame.font.Font(font_path, 40)
-except Exception as e:
-    print(f"❌ 字型載入失敗: {e}")
-    try:
-        font = pygame.font.Font("msjh.ttc", 40)  # 微軟正黑體
-    except Exception as e:
-        print(f"❌ 微軟正黑體載入失敗: {e}")
-        font = pygame.font.SysFont("arial", 40)  # 備用
-
-# ✅ Emoji 字型處理（避免顯示錯誤）
-try:
-    equip_font = pygame.font.Font("seguiemj.ttf", 30)  # 支援 Emoji 的字型
-except:
-    print("Warning: Emoji font not found. Emoji may not display correctly.")
-    equip_font = pygame.font.SysFont("arial", 30)
-
-# 顯示升級選單的字型
-upgrade_font = pygame.font.Font(font_path, 30) #  <<<===  修改: 使用 font_path 變數載入字型檔案
-upgrade_font_small = pygame.font.Font(font_path, 24) #  <<<===  修改: 使用 font_path 變數載入字型檔案
+# Example placeholders (these would be set by the caller using settings)
+screen = None # Will be set by settings['screen']
+WIDTH, HEIGHT = 0, 0 # Will be set by settings['WIDTH'], settings['HEIGHT']
+font = None # Will be set by settings['fonts']['main']
+equip_font = None # Will be set by settings['fonts']['equip']
+upgrade_font = None # Will be set by settings['fonts']['upgrade']
+upgrade_font_small = None # Will be set by settings['fonts']['upgrade_small']
+COLOR_DICT = {} # Will be set by settings['colors']
+# Individual colors like BLACK, WHITE etc. will also be available from the settings dict.
+BLACK, WHITE, GREEN, ORANGE, BLUE, YELLOW, CYAN, RED, PINK, BROWN = [(0,0,0)]*10 # Placeholders
+LIGHT_GREEN, LIGHT_YELLOW, LIGHT_BLUE, LIGHT_CYAN, PURPLE, DARK_RED = [(0,0,0)]*6 # Placeholders
 
 
 user_input = ""  # 儲存玩家輸入的文字
@@ -104,41 +86,7 @@ for event in pygame.event.get():
 
 
 
-# ==================== 顏色定義 ====================
-BLACK = (0, 0, 0)
-WHITE = (255, 255, 255)
-GREEN = (0, 255, 0)
-ORANGE = (255, 165, 0)
-BLUE = (0, 0, 255)
-YELLOW = (255, 255, 0)
-CYAN = (0, 255, 255)
-RED = (255, 0, 0)
-PINK = (255, 192, 203)
-BROWN = (139, 69, 19)
-LIGHT_GREEN = (144, 238, 144)
-LIGHT_YELLOW = (255, 255, 224)
-LIGHT_BLUE = (173, 216, 230)
-LIGHT_CYAN = (224, 255, 255)
-PURPLE = (128, 0, 128)
-DARK_RED = (139, 0, 0)
-
-
-COLOR_DICT = { #  定義 COLOR_DICT 字典 (請放在顏色常數定義 *下方*)
-    "BLACK": BLACK,
-    "GREEN": GREEN,
-    "ORANGE": ORANGE,
-    "BLUE": BLUE,
-    "YELLOW": YELLOW,
-    "CYAN": CYAN,
-    "RED": RED,
-    "PINK": PINK,
-    "BROWN": BROWN,
-    "LIGHT_GREEN": LIGHT_GREEN,
-    "LIGHT_YELLOW": LIGHT_YELLOW,
-    "LIGHT_BLUE": LIGHT_BLUE,
-    "LIGHT_CYAN": LIGHT_CYAN,
-    # ... 可以根據需要繼續擴充 ...
-}
+# Color definitions are now loaded from settings.py
 
 # ================= Floating Text System =====================
 floating_texts = []  # Each: {"text": str, "pos": (x,y), "timer": ms}
@@ -347,9 +295,14 @@ def handle_attacks():
 
 # ================= upgrade system =====================
 def draw_upgrade_overlay(frame_surface, upgrade_options, player_level): # 修改: 接收 upgrade_options 和 player_level
+    # In a real scenario, WIDTH and HEIGHT would be initialized from settings
+    if WIDTH == 0 or HEIGHT == 0: # Basic check if settings were loaded
+        print("Error: WIDTH or HEIGHT not initialized. Ensure settings are loaded.")
+        return # Avoid pygame.Surface error if WIDTH/HEIGHT are zero
+
     # 在已有戰鬥畫面上疊加半透明濾鏡
     overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-    overlay.fill((255, 255, 255, 0))
+    overlay.fill((255, 255, 255, 0)) # Assuming WHITE is available or use (255,255,255,0)
     frame_surface.blit(overlay, (0, 0))
 
     box_width, box_height = 300, 200
@@ -361,29 +314,36 @@ def draw_upgrade_overlay(frame_surface, upgrade_options, player_level): # 修改
     for i, option in enumerate(upgrade_options): # 修改: 迴圈處理升級選項
         box_x = start_x + i * (box_width + spacing)
         box_rect = pygame.Rect(box_x, start_y, box_width, box_height)
-        pygame.draw.rect(frame_surface, BLACK, box_rect, 2)
+        # Ensure BLACK, COLOR_DICT, GREEN, upgrade_font, upgrade_font_small are loaded from settings
+        if not all([COLOR_DICT, upgrade_font, upgrade_font_small]):
+            print("Error: Colors or fonts not initialized in draw_upgrade_overlay.")
+            return
+
+        pygame.draw.rect(frame_surface, COLOR_DICT.get("BLACK", (0,0,0)), box_rect, 2)
 
         # 根據 upgrade_options_data 中的 display_color 決定方框顏色
         box_color_name = option.get("display_color", "GREEN") # 預設顏色為 GREEN
-        box_color = COLOR_DICT.get(box_color_name, GREEN) # 使用 COLOR_DICT 取得顏色值，預設為 GREEN
+        box_color = COLOR_DICT.get(box_color_name, COLOR_DICT.get("GREEN",(0,255,0))) # 使用 COLOR_DICT 取得顏色值，預設為 GREEN
         pygame.draw.rect(frame_surface, box_color, (box_rect.x + 20, box_rect.y + 20, box_width - 40, box_height - 80))
 
-        txt_option_name = upgrade_font.render(option["name"], True, BLACK) # 使用選項名稱
+        txt_option_name = upgrade_font.render(option["name"], True, COLOR_DICT.get("BLACK",(0,0,0))) # 使用選項名稱
         frame_surface.blit(txt_option_name, (box_rect.x + 20, box_rect.y + box_height - 100)) # 調整位置
 
-        txt_description = upgrade_font_small.render(option["description"], True, BLACK) # 使用選項描述
+        txt_description = upgrade_font_small.render(option["description"], True, COLOR_DICT.get("BLACK",(0,0,0))) # 使用選項描述
         frame_surface.blit(txt_description, (box_rect.x + 20, box_rect.y + box_height - 60)) # 調整位置
 
         # 顯示按鍵提示 (例如 "Press 1", "Press 2", "Press Q" etc.)，使用 key_binding 屬性
         key_prompt_text = f"Press {option['key_binding']}"
-        key_prompt = upgrade_font.render(key_prompt_text, True, BLACK)
+        key_prompt = upgrade_font.render(key_prompt_text, True, COLOR_DICT.get("BLACK",(0,0,0)))
         frame_surface.blit(key_prompt, (box_rect.x + 20, box_rect.y + box_height - 30)) # 調整位置
 
 
-    prompt = upgrade_font.render("Choose upgrade", True, BLACK) # 提示文字簡化
+    prompt = upgrade_font.render("Choose upgrade", True, COLOR_DICT.get("BLACK",(0,0,0))) # 提示文字簡化
     frame_surface.blit(prompt, (WIDTH // 2 - prompt.get_width() // 2, start_y + box_height + 20))
-    screen.blit(frame_surface, (0, 0))
-    pygame.display.update()
+    
+    if screen: # Ensure screen is initialized
+        screen.blit(frame_surface, (0, 0))
+        pygame.display.update()
 
 class Bomb:
     def __init__(self, x, y, target_x, target_y):
@@ -529,10 +489,14 @@ class Enemy:
 
     def draw(self, surface):
         rect = pygame.Rect(self.x, self.y, self.size, self.size)
+        # Ensure BLACK, GREEN are loaded from settings
+        current_black = COLOR_DICT.get("BLACK", (0,0,0))
+        current_green = COLOR_DICT.get("GREEN", (0,255,0))
+
         pygame.draw.rect(surface, self.color, rect)
-        pygame.draw.rect(surface, BLACK, (self.x, self.y - 10, self.size, 5))
+        pygame.draw.rect(surface, current_black, (self.x, self.y - 10, self.size, 5))
         hp_bar = self.size * (self.hp / self.max_hp) if self.max_hp else 0
-        pygame.draw.rect(surface, GREEN, (self.x, self.y - 10, hp_bar, 5))
+        pygame.draw.rect(surface, current_green, (self.x, self.y - 10, hp_bar, 5))
 
     def is_near(self, target_x, target_y, radius):
         return math.sqrt((self.x - target_x) ** 2 + (self.y - target_y) ** 2) < radius
@@ -633,36 +597,60 @@ def get_nearest_enemy(player_center):
     return nearest_index, enemy_center
 
 def start_screen():
+    # Ensure WIDTH, HEIGHT, WHITE, font, BLACK, screen are loaded
+    if not all([WIDTH, HEIGHT, font, screen]):
+        print("Error: Essential settings not loaded for start_screen.")
+        # Potentially exit or handle error, for now, just return to avoid crashing
+        pygame.quit()
+        sys.exit()
+        return
+
+    current_white = COLOR_DICT.get("WHITE", (255,255,255))
+    current_black = COLOR_DICT.get("BLACK", (0,0,0))
+
     waiting = True
     while waiting:
         frame = pygame.Surface((WIDTH, HEIGHT))
-        frame.fill(WHITE)
-        title_text = font.render("穿越成為成最強冒險家", True, BLACK)
-        prompt_text = font.render("Press ENTER to Start", True, BLACK)
+        frame.fill(current_white)
+        title_text = font.render("穿越成為成最強冒險家", True, current_black)
+        prompt_text = font.render("Press ENTER to Start", True, current_black)
         frame.blit(title_text, (WIDTH//2 - title_text.get_width()//2, HEIGHT//2 - title_text.get_height() - 20))
         frame.blit(prompt_text, (WIDTH//2 - prompt_text.get_width()//2, HEIGHT//2 + 20))
         screen.blit(frame, (0, 0))
         pygame.display.update()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit(); sys.exit()
+                pygame.quit()
+                sys.exit()
             if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
                 waiting = False
 
 def end_screen():
+    # Ensure WIDTH, HEIGHT, WHITE, font, RED, upgrade_font, BLACK, screen are loaded
+    if not all([WIDTH, HEIGHT, font, upgrade_font, screen, COLOR_DICT]):
+        print("Error: Essential settings not loaded for end_screen.")
+        pygame.quit()
+        sys.exit()
+        return False # Default to quit if settings are missing
+
+    current_white = COLOR_DICT.get("WHITE", (255,255,255))
+    current_red = COLOR_DICT.get("RED", (255,0,0))
+    current_black = COLOR_DICT.get("BLACK", (0,0,0))
+
     waiting = True
     while waiting:
         frame = pygame.Surface((WIDTH, HEIGHT))
-        frame.fill(WHITE)
-        prompt_text = font.render("Game Over", True, RED)
-        option_text = upgrade_font.render("Press R to Restart or Q to Quit", True, BLACK)
+        frame.fill(current_white)
+        prompt_text = font.render("Game Over", True, current_red)
+        option_text = upgrade_font.render("Press R to Restart or Q to Quit", True, current_black)
         frame.blit(prompt_text, (WIDTH//2 - prompt_text.get_width()//2, HEIGHT//2 - prompt_text.get_height()))
         frame.blit(option_text, (WIDTH//2 - option_text.get_width()//2, HEIGHT//2 + 20))
         screen.blit(frame, (0, 0))
         pygame.display.update()
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                pygame.quit(); sys.exit()
+                pygame.quit()
+                sys.exit()
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_r:
                     return True
@@ -671,51 +659,94 @@ def end_screen():
                 
 def draw_hp_bar(surface, player_hp, player_max_hp):
     """繪製血條"""
+    # Ensure BLACK, GREEN, font, WIDTH are loaded
+    if not all ([font, COLOR_DICT, WIDTH]):
+        print("Error: settings not loaded for draw_hp_bar")
+        return
+    current_black = COLOR_DICT.get("BLACK", (0,0,0))
+    current_green = COLOR_DICT.get("GREEN", (0,255,0))
+
     hp_bar_width = 200
     hp_ratio = player_hp / player_max_hp
-    pygame.draw.rect(surface, BLACK, (WIDTH - hp_bar_width - 20, 20, hp_bar_width, 20))
-    pygame.draw.rect(surface, GREEN, (WIDTH - hp_bar_width - 20, 20, hp_bar_width * hp_ratio, 20))
-    hp_text = font.render(f"HP: {player_hp}/{player_max_hp}", True, BLACK)
+    pygame.draw.rect(surface, current_black, (WIDTH - hp_bar_width - 20, 20, hp_bar_width, 20))
+    pygame.draw.rect(surface, current_green, (WIDTH - hp_bar_width - 20, 20, hp_bar_width * hp_ratio, 20))
+    hp_text = font.render(f"HP: {player_hp}/{player_max_hp}", True, current_black)
     surface.blit(hp_text, (WIDTH - hp_bar_width - 20, 50))
 
 def draw_exp_bar(surface, player_exp, player_level):
     """繪製經驗條"""
+    # Ensure BLACK, GREEN are loaded
+    if not COLOR_DICT:
+        print("Error: settings not loaded for draw_exp_bar")
+        return
+    current_black = COLOR_DICT.get("BLACK", (0,0,0))
+    current_green = COLOR_DICT.get("GREEN", (0,255,0))
+
     exp_bar_width = 200
     required_exp = 30 * (player_level ** 2)
     exp_ratio = player_exp / required_exp
-    pygame.draw.rect(surface, BLACK, (20, 20, exp_bar_width, 10))
-    pygame.draw.rect(surface, GREEN, (20, 20, exp_bar_width * exp_ratio, 10))
+    pygame.draw.rect(surface, current_black, (20, 20, exp_bar_width, 10))
+    pygame.draw.rect(surface, current_green, (20, 20, exp_bar_width * exp_ratio, 10))
 
 def draw_game_info(surface, player_level, current_wave, max_waves):
     """顯示遊戲基本資訊"""
-    level_text = font.render(f"Level: {player_level}", True, BLACK)
+    # Ensure font, BLACK are loaded
+    if not all([font, COLOR_DICT]):
+        print("Error: settings not loaded for draw_game_info")
+        return
+    current_black = COLOR_DICT.get("BLACK", (0,0,0))
+    level_text = font.render(f"Level: {player_level}", True, current_black)
     surface.blit(level_text, (20, 40))
-    wave_text = font.render(f"Wave: {current_wave}/{max_waves}", True, BLACK)
+    wave_text = font.render(f"Wave: {current_wave}/{max_waves}", True, current_black)
     surface.blit(wave_text, (20, 100))
 
 def draw_equipment_panel(surface, player_equipment, equipment_icons, equipment_descriptions):
     """繪製裝備欄"""
+    # Ensure WIDTH, BLACK, equip_font, upgrade_font are loaded
+    if not all([WIDTH, COLOR_DICT, equip_font, upgrade_font]):
+        print("Error: settings not loaded for draw_equipment_panel")
+        return
+    current_black = COLOR_DICT.get("BLACK", (0,0,0))
     panel_x = WIDTH - 300
     panel_y = 150
     panel_width = 280
     panel_height = 300
-    pygame.draw.rect(surface, BLACK, (panel_x, panel_y, panel_width, panel_height), 2)
+    pygame.draw.rect(surface, current_black, (panel_x, panel_y, panel_width, panel_height), 2)
     for i, eq in enumerate(player_equipment):
         icon = equipment_icons.get(eq["name"], eq["name"])
         if eq["rare"]:
             icon += "★"
-        txt_icon = equip_font.render(icon, True, BLACK)
-        txt_desc = upgrade_font.render(equipment_descriptions.get(eq["name"], ""), True, BLACK)
+        txt_icon = equip_font.render(icon, True, current_black)
+        txt_desc = upgrade_font.render(equipment_descriptions.get(eq["name"], ""), True, current_black)
         surface.blit(txt_icon, (panel_x + 10, panel_y + 10 + i * 50))
         surface.blit(txt_desc, (panel_x + 50, panel_y + 10 + i * 50))
 
-def draw_pause_menu(screen):
+def draw_pause_menu(current_screen): # Renamed screen to current_screen to avoid conflict with global
     """繪製暫停選單"""
+    # Ensure WIDTH, HEIGHT, font (from settings['fonts']['main']) are loaded
+    # The original code uses `font_path` to load a new font instance here.
+    # It's better to use one of the pre-loaded fonts from settings.
+    # Assuming `settings['fonts']['main']` is desired here, or a specific large font.
+    if not all([WIDTH, HEIGHT, font, current_screen]): # font here refers to global placeholder
+        print("Error: settings not loaded for draw_pause_menu")
+        return
+
+    # Use a pre-loaded font, e.g., the main font, or a specific menu font if defined in settings
+    menu_font = pygame.font.Font(None, 50) # Fallback, ideally use settings['fonts']['menu_large']
+    if 'main' in fonts: # fonts is the dict from settings
+        try:
+            # Attempt to create a larger version of the main font if path is stored, or use a specific menu font
+            # For simplicity, let's assume main_font can be resized or a dedicated menu font is used.
+            # This example will just use a new system font if font_path is not easily accessible
+             menu_font = pygame.font.Font(fonts['main'].name, 50) if fonts['main'].name else pygame.font.SysFont("arial", 50)
+        except: # Fallback if name is not available or path is complex
+            menu_font = pygame.font.SysFont("arial", 50)
+
+
     overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
     overlay.fill((0, 0, 0, 180))  # 半透明黑色背景
-    screen.blit(overlay, (0, 0))
+    current_screen.blit(overlay, (0, 0))
 
-    font = pygame.font.Font(font_path, 50)  # 使用指定的中文字型
     options = ["繼續遊戲", "設定", "回到首頁"]
     option_y = HEIGHT // 2 - 50
 
@@ -726,11 +757,18 @@ def draw_pause_menu(screen):
         option_y += 60
 
 def draw_main_menu(screen):
+    # Ensure WIDTH, HEIGHT, upgrade_font, screen are loaded
+    if not all([WIDTH, HEIGHT, upgrade_font, screen]):
+        print("Error: settings not loaded for draw_main_menu")
+        return
+
     overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-    overlay.fill((50, 50, 50, 255))
-    title = upgrade_font.render("主選單", True, (255, 255, 255))
+    overlay.fill((50, 50, 50, 255)) # Using direct color values
+    # Assuming WHITE is (255,255,255)
+    current_white_color = COLOR_DICT.get("WHITE", (255,255,255))
+    title = upgrade_font.render("主選單", True, current_white_color)
     overlay.blit(title, (WIDTH // 2 - title.get_width() // 2, HEIGHT // 2 - 100))
-    option = upgrade_font.render("按 Enter 開始遊戲", True, (255, 255, 255))
+    option = upgrade_font.render("按 Enter 開始遊戲", True, current_white_color)
     overlay.blit(option, (WIDTH // 2 - option.get_width() // 2, HEIGHT // 2))
     screen.blit(overlay, (0, 0))
     pygame.display.flip()
@@ -738,460 +776,15 @@ def draw_main_menu(screen):
 
 
 
-is_upgrading = False  # 是否進入升級狀態
-upgrade_done = False  # 升級選項是否選擇完成
+# is_upgrading and upgrade_done are now local to run_game in game.py
+# The start_screen() call is now managed by run_game in game.py
+# The main game loop is moved to run_game in game.py
+# Pygame final quit and display updates are also in run_game.
 
-start_screen()
-
-# ================= Main Game Loop =====================
-running = True
-while running:
-    dt = clock.tick(60)
-    # Use frame_surface for potential screen shake
-    frame_surface = pygame.Surface((WIDTH, HEIGHT))
-    frame_surface.fill(WHITE)
-    current_time = pygame.time.get_ticks()
-    update_floating_texts(dt)
-    
-    # Dynamic enemy spawn: if on-screen count below limit and remaining > 0, spawn new enemy
-    while len(enemies) < max_enemies_on_screen and remaining_enemies_to_spawn > 0:
-        enemies.append(spawn_enemy(current_wave))
-        remaining_enemies_to_spawn -= 1
-
-    # *** 插入炸彈更新和繪製代碼 ***
-    for bomb in bombs:
-        bomb.move()  # 更新炸彈位置
-        if bomb.should_be_removed(): # 檢查炸彈是否需要被移除
-          bombs.remove(bomb) # 從列表中移除炸彈
-          continue # 繼續下一個炸彈的處理
-
-        bomb.draw(frame_surface) # 在 frame_surface 上繪製炸彈
-
-    # Energy Core effect: every 10 sec trigger electric shock (50 dmg within 150px)
-    if any(e["name"] == "Energy Core" for e in player_equipment):
-        if current_time - last_elec_time >= 10000:
-            last_elec_time = current_time
-            player_center = (player_x + player_size / 2, player_y + player_size / 2)
-            for enemy in enemies:
-                ex, ey = enemy.x, enemy.y
-                enemy_center = (ex + enemy.size / 2, ey + enemy.size / 2)
-
-                # 更新敵人的行為模式
-                enemy.update_behavior(player_x, player_y, enemies)
-                # 判斷是否觸發電擊
-                if math.hypot(enemy_center[0] - player_center[0], enemy_center[1] - player_center[1]) < 150:
-                    enemy.hp -= 50
-                    add_floating_text("⚡ Electric Shock!", enemy_center, 1000)
-
-    
-    # ---------- Event Handling ----------
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
-
-        elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                if game_state == "playing":
-                    game_state = "paused"
-                elif game_state == "paused":
-                    game_state = "playing"
-
-        # 如果處於暫停狀態，處理選單點擊
-        elif game_state == "paused" and event.type == pygame.MOUSEBUTTONDOWN:
-            mouse_x, mouse_y = pygame.mouse.get_pos()
-            if HEIGHT // 2 - 50 <= mouse_y <= HEIGHT // 2 + 10:
-                game_state = "playing"  # 點擊「繼續遊戲」
-            elif HEIGHT // 2 + 10 <= mouse_y <= HEIGHT // 2 + 70:
-                print("⚙️ [DEBUG] 設定功能尚未實作")  # 點擊「設定」
-            elif HEIGHT // 2 + 70 <= mouse_y <= HEIGHT // 2 + 130:
-                game_state = "menu"  # 點擊「回到首頁」
-
-    # ---------- 主遊戲迴圈 ----------
-    if game_state == "paused":
-        draw_pause_menu(screen)  # 自定義的暫停選單函數
-        pygame.display.flip()
-        continue  # 暫停時不更新其他遊戲邏輯
-
-    if game_state == "menu":
-        draw_main_menu(screen)
-        continue  # 當處於主選單狀態時，暫停其他遊戲邏輯
-
-
-
-
-    # ---------- 使用 keyboard 函式庫 偵測空白鍵 ----------
-    if keyboard.is_pressed("space"): #  <--- 使用 keyboard.is_pressed() 偵測空白鍵
-        # Trigger sword attack if available
-        if weapons["sword"] and not sword_swinging:
-            sword_swinging = True
-            sword_swing_start = current_time
-            sword_hit_list = []
-        # Trigger bullet attack if available
-        if weapons["bullet"]:
-            if current_time - last_bullet_time > bullet_cooldown:
-                last_bullet_time = current_time
-                muzzle_flash_time = current_time + muzzle_flash_duration
-                player_center = (player_x+player_size/2, player_y+player_size/2)
-                index, target_center = get_nearest_enemy(player_center)
-                if target_center is not None:
-                    dx = target_center[0]-player_center[0]
-                    dy = target_center[1]-player_center[1]
-                    primary_angle = math.atan2(dy, dx)
-                else:
-                    primary_angle = math.atan2(last_dir[1], last_dir[0]) 
-                for i in range(bullet_count):
-                    offset = random.uniform(-bullet_spread/2, bullet_spread/2)
-                    angle = primary_angle + offset
-                    direction = (math.cos(angle), math.sin(angle))
-                    bullet = {"x": player_center[0], "y": player_center[1], "dir": direction}
-                    bullets.append(bullet)
-            
-    
-    # ---------- Player Movement & Direction ----------
-    keys = pygame.key.get_pressed()
-    dx = int(keys[pygame.K_RIGHT]) - int(keys[pygame.K_LEFT])
-    dy = int(keys[pygame.K_DOWN]) - int(keys[pygame.K_UP])
-    if dx or dy:
-        magnitude = math.hypot(dx, dy)
-        last_dir = (dx/magnitude, dy/magnitude)
-    if keys[pygame.K_LEFT]:
-        player_x -= base_player_speed
-    if keys[pygame.K_RIGHT]:
-        player_x += base_player_speed
-    if keys[pygame.K_UP]:
-        player_y -= base_player_speed
-    if keys[pygame.K_DOWN]:
-        player_y += base_player_speed
-
-    # *** 使用 pygame.key.get_pressed() 偵測空白鍵狀態 ***
-    keys = pygame.key.get_pressed()
-    if keys[pygame.K_SPACE]:
-        # Trigger sword attack if available
-        if weapons["sword"] and not sword_swinging:
-            sword_swinging = True
-            sword_swing_start = current_time
-            sword_hit_list = []
-        # Trigger bullet attack if available
-        if weapons["bullet"]:
-            if current_time - last_bullet_time > bullet_cooldown:
-                last_bullet_time = current_time
-                muzzle_flash_time = current_time + muzzle_flash_duration
-                player_center = (player_x+player_size/2, player_y+player_size/2)
-                index, target_center = get_nearest_enemy(player_center)
-                if target_center is not None:
-                    dx = target_center[0]-player_center[0]
-                    dy = target_center[1]-player_center[1]
-                    primary_angle = math.atan2(dy, dx)
-                else:
-                    primary_angle = math.atan2(last_dir[1], last_dir[0])
-                for i in range(bullet_count):
-                    offset = random.uniform(-bullet_spread/2, bullet_spread/2)
-                    angle = primary_angle + offset
-                    direction = (math.cos(angle), math.sin(angle))
-                    bullet = {"x": player_center[0], "y": player_center[1], "dir": direction}
-                    bullets.append(bullet)
-
-
-    # Wind Boots: Increase speed by 15%
-    if any(e["name"] == "Wind Boots" for e in player_equipment):
-        player_speed = base_player_speed * 1.15
-    else:
-        player_speed = base_player_speed
-    player_x = max(0, min(WIDTH - player_size, player_x))
-    player_y = max(0, min(HEIGHT - player_size, player_y))
-    player_rect = pygame.Rect(player_x, player_y, player_size, player_size)
-    
-    # ---------- Draw Player ----------
-    pygame.draw.rect(frame_surface, BLUE, player_rect)
-    
-    # ---------- Draw Muzzle Flash ----------
-    if current_time < muzzle_flash_time:
-        flash_radius = 15
-        pygame.draw.circle(frame_surface, ORANGE, (player_x+player_size//2, player_y+player_size//2), flash_radius)
-    
-    # ---------- Update & Draw Enemies ----------
-    for enemy in enemies[:]:
-        etype = enemy.etype
-        if etype == "normal":
-            base_speed_enemy = 2; size = enemy.size; color = RED; max_hp_val = 100
-        elif etype == "elite":
-            base_speed_enemy = 3; size = enemy.size; color = PURPLE; max_hp_val = 150
-        elif etype == "boss":
-            base_speed_enemy = 1; size = enemy.size*2; color = DARK_RED; max_hp_val = 500
-        # Speed multiplier: increases with wave (multiplier = 1 + (current_wave-1)*0.1), except wave 1 fixed at 0.5
-        if current_wave == 1:
-            multiplier = 0.5
-        else:
-            multiplier = 1 + (current_wave - 1) * 0.1
-        speed = base_speed_enemy * multiplier
-        if player_x > enemy.x:
-            enemy.x += speed
-        elif player_x < enemy.x:
-            enemy.x -= speed
-        if player_y > enemy.y:
-            enemy.y += speed
-        elif player_y < enemy.y:
-            enemy.y -= speed
-        enemy_rect = pygame.Rect(enemy.x, enemy.y, size, size)
-        pygame.draw.rect(frame_surface, color, enemy_rect)
-        pygame.draw.rect(frame_surface, BLACK, (enemy.x, enemy.y-10, size, 5))
-        hp_bar_width = size * (enemy.hp/max_hp_val)
-        pygame.draw.rect(frame_surface, GREEN, (enemy.x, enemy.y-10, hp_bar_width, 5))
-        # Collision with player
-        if player_rect.colliderect(enemy_rect) and current_time - last_damage_time > player_damage_cooldown:
-            blocked = False
-            dodged = False
-            if any(e["name"] == "Guardian Shield" for e in player_equipment):
-                if random.random() < 0.5:
-                    blocked = True
-                    add_floating_text("🛡 Blocked!", (player_x, player_y-30))
-            if any(e["name"] == "Wind Boots" for e in player_equipment):
-                if random.random() < 0.1:
-                    dodged = True
-                    add_floating_text("MISS!", (player_x, player_y-30))
-            if not dodged:
-                if blocked:
-                    player_hp -= 5
-                else:
-                    player_hp -= 10
-            last_damage_time = current_time
-        # Burning effect from Flame Sword
-        if enemy.burn_time > 0:
-            if current_time - enemy.last_burn_tick >= 1000:
-                enemy.hp -= 5
-                enemy.burn_time -= 1000
-                enemy.last_burn_tick = current_time
-                add_floating_text("🔥 Burning", (enemy.x, enemy.y-40), 800)
-    
-    # ---------- Sword Attack Mechanism (Melee) ----------
-    if weapons["sword"] and sword_swinging:
-        elapsed = current_time - sword_swing_start
-        progress = min(1, elapsed / sword_duration)
-        current_radius = progress * sword_range
-        current_sector_angle = progress * sword_fan_angle
-        player_center = (player_x+player_size/2, player_y+player_size/2)
-        index, nearest_center = get_nearest_enemy(player_center)
-        if nearest_center is not None:
-            angle_center = math.atan2(nearest_center[1]-player_center[1],
-                                      nearest_center[0]-player_center[0])
-        else:
-            angle_center = math.atan2(last_dir[1], last_dir[0])
-        fan_points = [player_center]
-        num_points = 20
-        start_angle = angle_center - current_sector_angle/2
-        for i in range(num_points+1):
-            theta = start_angle + (current_sector_angle*i/num_points)
-            x = player_center[0] + current_radius * math.cos(theta)
-            y = player_center[1] + current_radius * math.sin(theta)
-            fan_points.append((x, y))
-        fan_color = (255, 0, 0, 200) if any(e["name"] == "Flame Sword" for e in player_equipment) else (255, 165, 0, 200)
-        fan_surface = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
-        pygame.draw.polygon(fan_surface, fan_color, fan_points)
-        frame_surface.blit(fan_surface, (0,0))
-        for enemy in enemies[:]:
-            if enemy in sword_hit_list:
-                continue
-            etype = enemy.etype
-            size = enemy.size*2 if etype=="boss" else enemy.size
-            enemy_center = (enemy.x+size/2, enemy.y+size/2)
-            dx_e = enemy_center[0]-player_center[0]
-            dy_e = enemy_center[1]-player_center[1]
-            dist = math.hypot(dx_e, dy_e)
-            if dist <= current_radius:
-                enemy_angle = math.atan2(dy_e, dx_e)
-                diff = abs((enemy_angle - angle_center + math.pi) % (2*math.pi) - math.pi)
-                if diff <= current_sector_angle/2:
-                    enemy.hp -= attack_damage
-                    # Apply knockback: 20 pixels for normal/elite, 10 for boss.
-                    knockback_force = 20 if enemy.etype != "boss" else 10
-                    if dist > 0:
-                        enemy.x += (dx_e/dist) * knockback_force
-                        enemy.y += (dy_e/dist) * knockback_force
-                    sword_hit_list.append(enemy)
-                    if any(e["name"] == "Flame Sword" for e in player_equipment):
-                        enemy.burn_time = 3000
-                        enemy.last_burn_tick = current_time
-                        add_floating_text("🔥 Burned", enemy_center, 1000)
-                    if enemy.hp <= 0:
-                        drop_equipment(enemy)
-                        enemies.remove(enemy)
-                        player_exp += 25
-        if elapsed > sword_duration:
-            sword_swinging = False
-    
-    # ---------- Bullet Attack Mechanism (Ranged) ----------
-    if weapons["bullet"]:
-        for bullet in bullets[:]:
-            prev_pos = (bullet["x"], bullet["y"])
-            bullet["x"] += bullet["dir"][0] * bullet_speed
-            bullet["y"] += bullet["dir"][1] * bullet_speed
-            pygame.draw.line(frame_surface, ORANGE, prev_pos, (bullet["x"], bullet["y"]), 2)
-            pygame.draw.circle(frame_surface, ORANGE, (int(bullet["x"]), int(bullet["y"])), 5)
-            if bullet["x"] < 0 or bullet["x"] > WIDTH or bullet["y"] < 0 or bullet["y"] > HEIGHT:
-                bullets.remove(bullet)
-                continue
-            bullet_rect = pygame.Rect(bullet["x"]-5, bullet["y"]-5, 10, 10)
-            for enemy in enemies[:]:
-                etype = enemy.etype
-                size = enemy.size*2 if etype=="boss" else enemy.size
-                enemy_rect = pygame.Rect(enemy.x, enemy.y, size, size)
-                if bullet_rect.colliderect(enemy_rect):
-                    enemy.hp -= attack_damage
-                    if any(e["name"] == "Explosive Shotgun" for e in player_equipment):
-                        for other in enemies:
-                            ox = other.x; oy = other.y
-                            if math.hypot(ox - enemy.x, oy - enemy.y) < 50:
-                                other.hp -= 5
-                        add_floating_text("💥 Explosion!", (enemy.x, enemy.y), 800)
-                        screen_shake_time = 300
-                        screen_shake_intensity = 5
-                    if enemy.hp <= 0:
-                        drop_equipment(enemy)
-                        enemies.remove(enemy)
-                        player_exp += 25
-                    if bullet in bullets:
-                        bullets.remove(bullet)
-                    break
-    
-    # ---------- Safety Check for Enemy Death ----------
-    for enemy in enemies[:]:
-        if enemy.hp <= 0:
-            drop_equipment(enemy)
-            enemies.remove(enemy)
-            player_exp += 25
-    
-    # ---------- Draw Floating Texts ----------
-    draw_floating_texts(frame_surface)
-    
-    # 呼叫 UI 繪製函數
-    draw_hp_bar(frame_surface, player_hp, player_max_hp)
-    draw_exp_bar(frame_surface, player_exp, player_level)
-    draw_game_info(frame_surface, player_level, current_wave, max_waves)
-    draw_equipment_panel(frame_surface, player_equipment, equipment_icons, equipment_descriptions)
-
-    # Top-center: Remaining enemy count
-    total_remaining = len(enemies) + remaining_enemies_to_spawn
-    enemy_count_text = upgrade_font.render(f"Enemies Left: {total_remaining}", True, BLACK)
-    frame_surface.blit(enemy_count_text, (WIDTH//2 - enemy_count_text.get_width()//2, 20))
-    # Top-right: Equipment display
-    equip_text = upgrade_font.render("Equipment:", True, BLACK)
-    frame_surface.blit(equip_text, (WIDTH - 220, 80))
-    for i, eq in enumerate(player_equipment):
-        icon = equipment_icons.get(eq["name"], eq["name"])
-        if eq["rare"]:
-            icon += "★"
-        txt = equip_font.render(icon, True, BLACK)
-        frame_surface.blit(txt, (WIDTH - 220, 110 + i * 30))
-    # Right-side: Equipment Info Panel
-    panel_x = WIDTH - 300
-    panel_y = 150
-    panel_width = 280
-    panel_height = 300
-    pygame.draw.rect(frame_surface, BLACK, (panel_x, panel_y, panel_width, panel_height), 2)
-    for i, eq in enumerate(player_equipment):
-        icon = equipment_icons.get(eq["name"], eq["name"])
-        if eq["rare"]:
-            icon += "★"
-        txt_icon = equip_font.render(icon, True, BLACK)
-        txt_desc = upgrade_font.render(equipment_descriptions.get(eq["name"], ""), True, BLACK)
-        frame_surface.blit(txt_icon, (panel_x + 10, panel_y + 10 + i * 50))
-        frame_surface.blit(txt_desc, (panel_x + 50, panel_y + 10 + i * 50))
-    
-    # ---------- Screen Shake Effect ----------
-    if screen_shake_time > 0:
-        offset_x = random.randint(-int(screen_shake_intensity), int(screen_shake_intensity))
-        offset_y = random.randint(-int(screen_shake_intensity), int(screen_shake_intensity))
-        screen.blit(frame_surface, (offset_x, offset_y))
-        screen_shake_time -= dt
-    else:
-        screen.blit(frame_surface, (0, 0))
-    
-    pygame.display.update()
-    
-    # ---------- Wave Check ----------
-    if total_remaining == 0:
-        current_wave += 1
-        if current_wave > max_waves:
-            win_surface = pygame.Surface((WIDTH, HEIGHT))
-            win_surface.fill(WHITE)
-            win_text = font.render("You cleared all waves!", True, GREEN)
-            win_surface.blit(win_text, (WIDTH//2 - win_text.get_width()//2, HEIGHT//2 - win_text.get_height()//2))
-            screen.blit(win_surface, (0, 0))
-            pygame.display.update()
-            pygame.time.delay(3000)
-            running = False
-        else:
-            total_enemies_in_wave = 20
-            remaining_enemies_to_spawn = total_enemies_in_wave
-            enemies = []
-    
-    # ---------- Level Up Check ----------
-    # Required EXP increases quadratically: required_exp = 30 * (player_level^2)
-    # 在主遊戲循環內
-    required_exp = 30 * (player_level ** 2)
-    if player_exp >= required_exp:
-        player_exp = 0
-        is_upgrading = True
-        upgrade_done = False
-
-        # ----- 篩選可用的升級選項 -----
-        available_upgrades = [ #  使用列表推導式，篩選出符合等級需求的升級選項
-            option for option in upgrade_options_data if player_level >= option["level_required"]
-        ]
-
-        # ----- 限制升級選項數量 (例如最多顯示 3 個) -----
-        import random #  如果使用 random.sample，需要 import random
-        if len(available_upgrades) > 3:
-            upgrade_choices = random.sample(available_upgrades, 3) #  從可用選項中隨機挑選 3 個
-        else:
-            upgrade_choices = available_upgrades #  如果可用選項少於 3 個，則全部顯示
-
-        # 保留當前戰鬥畫面在 frame_surface 中（假設它已經包含所有戰鬥元素）
-        while not upgrade_done:
-            draw_upgrade_overlay(frame_surface, upgrade_choices, player_level) # 修改: 傳入 upgrade_choices 和 player_level
-
-            # Pygame 事件迴圈，*只處理 QUIT 事件*
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                            pygame.quit(); sys.exit()
-
-            # *** 使用 keyboard 函式庫 *直接偵測* 按鍵，並根據 upgrade_choices 判斷選項 ***
-                for option in upgrade_choices: # 迴圈檢查每個升級選項
-                    key = option["key_binding"] # 取得選項綁定的按鍵
-                    if keyboard.is_pressed(key): # 偵測按鍵是否被按下
-                        print(f"[DEBUG - 升級選單] 按下按鍵 {key}，選擇升級：{option['name']}") # 除錯訊息
-
-                        # ----- 套用升級效果 -----
-                        effect_code = option["effect"] # 取得升級效果程式碼字串
-                        exec(effect_code) #  執行升級效果程式碼 (!!!  請務必仔細檢查 effect_code 的安全性 !!! )
-
-                        upgrade_done = True # 完成升級選擇
-
-
-        is_upgrading = False
-        player_level += 1
-
-
-
-    
-    # ---------- Player Death Check ----------
-    if player_hp <= 0:
-        restart = end_screen()
-        if restart:
-            player_hp = player_max_hp = 100
-            player_level = 1
-            player_exp = 0
-            current_wave = 1
-            total_enemies_in_wave = 20
-            remaining_enemies_to_spawn = total_enemies_in_wave
-            enemies = []
-            player_equipment = []
-            weapons = {"sword": True, "bullet": False}
-            sword_advanced = False
-        else:
-            pygame.quit(); sys.exit()
-
-
-pygame.display.update()
-pygame.quit()
+# The global variables for game state like player_hp, enemies, current_wave, etc.,
+# are removed from here as they will be local to the run_game function.
+# Helper functions and class definitions remain for now.
+# The placeholder settings variables (screen, WIDTH, HEIGHT, fonts, COLOR_DICT)
+# also remain for now as the helper functions in this file still depend on them.
+# In future refactoring, these functions will be moved to appropriate modules
+# and will receive necessary data (like screen, settings) as parameters.
