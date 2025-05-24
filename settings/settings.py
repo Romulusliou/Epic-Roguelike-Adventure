@@ -56,7 +56,7 @@ def get_color(name):
 
 def init_settings():
     print("✅ settings.py: init_settings() 被呼叫")
-    return 1920, 1080, None, None, None, None
+    
 
     pygame.init()
     infoObject = pygame.display.Info()
