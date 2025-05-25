@@ -402,7 +402,7 @@ def run_game(settings, game_clock_ref):
             if near_c:aim_a=math.atan2(near_c[1]-p_c[1],near_c[0]-p_c[0])
             arc_s=aim_a-c_a/2;arc_ps=[p_c]+[(p_c[0]+c_r*math.cos(arc_s+c_a*i/20),p_c[1]+c_r*math.sin(arc_s+c_a*i/20))for i in range(21)]
             s_cn="RED_TRANSPARENT" if any(e["name"]=="Flame Sword" for e in p_eq_ingame) else "ORANGE_TRANSPARENT"
-            s_c=module_colors_dict.get(s_cn,(255,165,0,100));
+            s_c=module_COLOR_DICT.get(s_cn,(255,165,0,100));
             if len(arc_ps)>2:pygame.draw.polygon(frame,s_c,arc_ps)
             for eo in enemies_l_ingame[:]:
                 if eo in swd_hit:continue
