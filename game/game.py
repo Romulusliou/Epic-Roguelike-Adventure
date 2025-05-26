@@ -361,9 +361,12 @@ def run_game(settings, game_clock_ref):
         if rem_en_spawn>0 and len(enemies_l_ingame)<max_en_screen:
             enemies_l_ingame.append(spawn_enemy_local(_current_wave_module_level,bombs_l_ingame,enemies_l_ingame))
             rem_en_spawn-=1
-        for b_obj in bombs_l_ingame[:]: b_obj.move(); 
-        if b_obj.should_be_removed():bombs_l_ingame.remove(b_obj)
-        else:b_obj.draw(frame)
+        for b_obj in bombs_l_ingame[:]: 
+            b_obj.move()
+            if b_obj.should_be_removed():
+                bombs_l_ingame.remove(b_obj)
+            else:
+                b_obj.draw(frame)
         if any(eq["name"]=="Energy Core" for eq in p_eq_ingame)and now-last_ec_t>=10000:
             last_ec_t=now;p_c=(px+p_size/2,py+p_size/2)
             for en in enemies_l_ingame:ec=(en.x+en.size/2,en.y+en.size/2);
