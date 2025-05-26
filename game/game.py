@@ -323,7 +323,7 @@ def run_game(settings, game_clock_ref):
         nonlocal px,py,php,pm_hp,p_lvl,p_exp,base_spd,php_regen,pc_rate,pd_rate,enemies_l_ingame,bombs_l_ingame,rem_en_spawn,atk_dmg,p_eq_ingame,wpns,swd_swing,p_last_dir,game_st,is_upg,upg_done,last_p_dmg_t,last_ec_t, bullets_l_ingame, floating_texts_l_ingame
         global _current_wave_module_level
         px,py=module_WIDTH//2,module_HEIGHT//2;php,pm_hp=100,100;p_lvl,p_exp=1,0;base_spd=5.0;php_regen,pc_rate,pd_rate=0.0,0.0,0.0;atk_dmg=25
-        enemies_l_ingame,bombs_l_ingame,bullets_l_ingame,floating_texts_l_ingame=[],[];_current_wave_module_level=0;p_eq_ingame=[]
+        enemies_l_ingame,bombs_l_ingame,bullets_l_ingame,floating_texts_l_ingame=[],[],[],[];_current_wave_module_level=0;p_eq_ingame=[]
         wpns={"sword":True,"bullet":False};swd_swing,p_last_dir=False,(0.0,-1.0);is_upg,upg_done=False,False;last_p_dmg_t,last_ec_t=0,0
 
     def next_wave_local_ingame(): 
