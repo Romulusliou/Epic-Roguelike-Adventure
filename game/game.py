@@ -368,9 +368,13 @@ def run_game(settings, game_clock_ref):
             else:
                 b_obj.draw(frame)
         if any(eq["name"]=="Energy Core" for eq in p_eq_ingame)and now-last_ec_t>=10000:
-            last_ec_t=now;p_c=(px+p_size/2,py+p_size/2)
-            for en in enemies_l_ingame:ec=(en.x+en.size/2,en.y+en.size/2);
-        if math.hypot(ec[0]-p_c[0],ec[1]-p_c[1])<150:en.hp-=50;add_floating_text_local(floating_texts_l_ingame,"⚡ Shock!",ec)
+            last_ec_t=now
+            p_c=(px+p_size/2,py+p_size/2)
+            for en in enemies_l_ingame:
+                ec=(en.x+en.size/2,en.y+en.size/2)
+                if math.hypot(ec[0]-p_c[0],ec[1]-p_c[1])<150:
+                    en.hp-=50
+                    add_floating_text_local(floating_texts_l_ingame,"⚡ Shock!",ec)
         if keyboard.is_pressed("space"):
             if wpns["sword"]and not swd_swing:swd_swing=True;swd_start_t=now;swd_hit=[]
             if wpns["bullet"]and(now-last_b_time>bullet_cooldown_val):
