@@ -3,7 +3,6 @@ import sys
 import random
 import math
 import os 
-import keyboard 
 import time
 
 # --- Module-level placeholders for settings (to be updated by run_game) ---
@@ -193,6 +192,29 @@ def get_nearest_enemy_local(player_center, current_enemies_list):
         if dist < min_d: min_d, idx, center = dist, i, enemy_c
     return idx, center
 
+def draw_text_wrapped(surface, text, font, color, rect, aa=True, bkg=None):
+    lines = []
+    words = text.split(' ')
+    current_line = ""
+    line_height = font.get_linesize()
+
+    for word in words:
+        test_line = current_line + word + " "
+        if font.size(test_line)[0] <= rect.width:
+            current_line = test_line
+        else:
+            lines.append(current_line)
+            current_line = word + " "
+    lines.append(current_line) # Add the last line
+
+    y = rect.top
+    for line_text in lines:
+        if line_text.strip(): # Avoid rendering empty lines
+            text_surface = font.render(line_text.strip(), aa, color, bkg)
+            surface.blit(text_surface, (rect.left, y))
+            y += line_height
+    return y # Return the y position after the last line, could be useful
+
 def start_screen_local(game_clock_ref): 
     wait = True; clock_local = game_clock_ref 
     while wait:
@@ -273,8 +295,23 @@ def draw_upgrade_overlay_local(base_surf, opts_list, p_lvl):
         color_n=opt.get("display_color","GREEN");rgb_c=module_COLOR_DICT.get(color_n,module_GREEN)
         pygame.draw.rect(base_surf,rgb_c,(opt_r.x+20,opt_r.y+20,box_w-40,box_h-80))
         nm_s=module_fonts['upgrade'].render(opt["name"],True,module_BLACK);base_surf.blit(nm_s,(opt_r.x+20,opt_r.y+box_h-100))
-        desc_s=module_fonts['upgrade_small'].render(opt["description"],True,module_BLACK);base_surf.blit(desc_s,(opt_r.x+20,opt_r.y+box_h-60))
-        key_s=module_fonts['upgrade'].render(f"Press {opt['key_binding']}",True,module_BLACK);base_surf.blit(key_s,(opt_r.x+20,opt_r.y+box_h-30))
+        
+        # New text wrapping for description:
+        desc_font = module_fonts['upgrade_small']
+        desc_color = module_BLACK
+        # Define the rectangle for the description text area
+        desc_text_rect_x = opt_r.x + 20
+        desc_text_rect_y_start = opt_r.y + box_h - 75 # Start Y for description text
+        
+        desc_rect_width = opt_r.width - 40 
+        # Height for description: from its start y to just above the "Press X" text.
+        desc_rect_height = (opt_r.y + box_h - 30) - desc_text_rect_y_start
+
+        desc_text_area_rect = pygame.Rect(desc_text_rect_x, desc_text_rect_y_start, desc_rect_width, desc_rect_height)
+        
+        draw_text_wrapped(base_surf, opt["description"], desc_font, desc_color, desc_text_area_rect)
+
+        key_s=module_fonts['upgrade'].render(f"Press {i+1}",True,module_BLACK);base_surf.blit(key_s,(opt_r.x+20,opt_r.y+box_h-30))
     pr_s=module_fonts['upgrade'].render("Choose upgrade",True,module_BLACK);base_surf.blit(pr_s,(module_WIDTH//2-pr_s.get_width()//2,sy+box_h+20))
 
 def spawn_enemy_local(wave, bombs_list_ref, enemies_list_ref): 
@@ -318,12 +355,15 @@ def run_game(settings, game_clock_ref):
     last_p_dmg_t,last_ec_t=0,0;is_upg,upg_done=False,False
     player_damage_cooldown = 500 
     bullet_cooldown = 300 
+    sword_duration = 300  # Duration of sword swing in milliseconds
+    sword_range = 50      # Range of sword attack in pixels
+    sword_fan_angle = math.radians(90) # Angle of sword attack in radians (90 degrees)
 
     def reset_state_local_ingame(): 
         nonlocal px,py,php,pm_hp,p_lvl,p_exp,base_spd,php_regen,pc_rate,pd_rate,enemies_l_ingame,bombs_l_ingame,rem_en_spawn,atk_dmg,p_eq_ingame,wpns,swd_swing,p_last_dir,game_st,is_upg,upg_done,last_p_dmg_t,last_ec_t, bullets_l_ingame, floating_texts_l_ingame
         global _current_wave_module_level
         px,py=module_WIDTH//2,module_HEIGHT//2;php,pm_hp=100,100;p_lvl,p_exp=1,0;base_spd=5.0;php_regen,pc_rate,pd_rate=0.0,0.0,0.0;atk_dmg=25
-        enemies_l_ingame,bombs_l_ingame,bullets_l_ingame,floating_texts_l_ingame=[],[];_current_wave_module_level=0;p_eq_ingame=[]
+        enemies_l_ingame,bombs_l_ingame,bullets_l_ingame,floating_texts_l_ingame=[],[],[],[];_current_wave_module_level=0;p_eq_ingame=[]
         wpns={"sword":True,"bullet":False};swd_swing,p_last_dir=False,(0.0,-1.0);is_upg,upg_done=False,False;last_p_dmg_t,last_ec_t=0,0
 
     def next_wave_local_ingame(): 
@@ -361,14 +401,23 @@ def run_game(settings, game_clock_ref):
         if rem_en_spawn>0 and len(enemies_l_ingame)<max_en_screen:
             enemies_l_ingame.append(spawn_enemy_local(_current_wave_module_level,bombs_l_ingame,enemies_l_ingame))
             rem_en_spawn-=1
-        for b_obj in bombs_l_ingame[:]: b_obj.move(); 
-        if b_obj.should_be_removed():bombs_l_ingame.remove(b_obj)
-        else:b_obj.draw(frame)
+        for b_obj in bombs_l_ingame[:]: 
+            b_obj.move()
+            if b_obj.should_be_removed():
+                bombs_l_ingame.remove(b_obj)
+            else:
+                b_obj.draw(frame)
         if any(eq["name"]=="Energy Core" for eq in p_eq_ingame)and now-last_ec_t>=10000:
-            last_ec_t=now;p_c=(px+p_size/2,py+p_size/2)
-            for en in enemies_l_ingame:ec=(en.x+en.size/2,en.y+en.size/2);
-        if math.hypot(ec[0]-p_c[0],ec[1]-p_c[1])<150:en.hp-=50;add_floating_text_local(floating_texts_l_ingame,"⚡ Shock!",ec)
-        if keyboard.is_pressed("space"):
+            last_ec_t=now
+            p_c=(px+p_size/2,py+p_size/2)
+            for en in enemies_l_ingame:
+                ec=(en.x+en.size/2,en.y+en.size/2)
+                if math.hypot(ec[0]-p_c[0],ec[1]-p_c[1])<150:
+                    en.hp-=50
+                    add_floating_text_local(floating_texts_l_ingame,"⚡ Shock!",ec)
+        
+        kmv=pygame.key.get_pressed();dxm,dym=0.0,0.0 # Ensure kmv is up-to-date before this check
+        if kmv[pygame.K_SPACE]:
             if wpns["sword"]and not swd_swing:swd_swing=True;swd_start_t=now;swd_hit=[]
             if wpns["bullet"]and(now-last_b_time>bullet_cooldown_val):
                 last_b_time=now;mflash_end_t=now+mflash_dur;p_c=(px+p_size/2,py+p_size/2)
@@ -402,7 +451,7 @@ def run_game(settings, game_clock_ref):
             if near_c:aim_a=math.atan2(near_c[1]-p_c[1],near_c[0]-p_c[0])
             arc_s=aim_a-c_a/2;arc_ps=[p_c]+[(p_c[0]+c_r*math.cos(arc_s+c_a*i/20),p_c[1]+c_r*math.sin(arc_s+c_a*i/20))for i in range(21)]
             s_cn="RED_TRANSPARENT" if any(e["name"]=="Flame Sword" for e in p_eq_ingame) else "ORANGE_TRANSPARENT"
-            s_c=module_colors_dict.get(s_cn,(255,165,0,100));
+            s_c=module_COLOR_DICT.get(s_cn,(255,165,0,100));
             if len(arc_ps)>2:pygame.draw.polygon(frame,s_c,arc_ps)
             for eo in enemies_l_ingame[:]:
                 if eo in swd_hit:continue
@@ -452,24 +501,42 @@ def run_game(settings, game_clock_ref):
             exec_v={"player_max_hp":pm_hp,"attack_damage":atk_dmg,"base_player_speed":base_spd,
                     "player_hp_regen":php_regen,"player_crit_rate":pc_rate,"player_dodge_rate":pd_rate,
                     "weapons":wpns.copy(),"player_speed":base_spd}
+            
+            key_map = {
+                "1": pygame.K_1, "2": pygame.K_2, "3": pygame.K_3,
+                "4": pygame.K_4, "5": pygame.K_5, "6": pygame.K_6, "7": pygame.K_7
+            }
             while is_upg and not upg_done:
-                cur_blit_off=blit_off;module_screen.blit(frame,cur_blit_off) 
+                cur_blit_off=blit_off # Preserve the screen shake effect if active
+                module_screen.blit(frame,cur_blit_off) 
                 draw_upgrade_overlay_local(module_screen,choices,p_lvl)
-                pygame.display.flip()
+                pygame.display.flip() # Ensure display is updated inside this loop
+
                 for evt_u in pygame.event.get():
-                    if evt_u.type==pygame.QUIT:running=False;is_upg=False
-                if not running:break
-                for opt_c in choices:
-                    if keyboard.is_pressed(opt_c["key_binding"]):
-                        try:
-                            exec(opt_c["effect"],{"pygame":pygame,"math":math,"random":random},exec_v)
-                            pm_hp=exec_v["player_max_hp"];atk_dmg=exec_v["attack_damage"]
-                            base_spd=exec_v.get("player_speed",base_spd);php_regen=exec_v["player_hp_regen"]
-                            pc_rate=exec_v["player_crit_rate"];pd_rate=exec_v["player_dodge_rate"]
-                            wpns=exec_v["weapons"]
-                        except Exception as e:print(f"Error applying upgrade '{opt_c['name']}': {e}")
-                        upg_done=True;is_upg=False;break
-                pygame.time.wait(20)
+                    if evt_u.type==pygame.QUIT:
+                        running=False
+                        is_upg=False
+                    if not running:break # Break from inner event loop if running is false
+                    if evt_u.type == pygame.KEYDOWN: # Check for keydown events
+                        for i, opt_c in enumerate(choices):  # Get index 'i'
+                            target_key = None
+                            if i == 0: target_key = pygame.K_1
+                            elif i == 1: target_key = pygame.K_2
+                            elif i == 2: target_key = pygame.K_3
+                            
+                            if target_key and evt_u.key == target_key:
+                                # Apply the effect of opt_c (the chosen upgrade)
+                                try:
+                                    exec(opt_c["effect"],{"pygame":pygame,"math":math,"random":random},exec_v)
+                                    pm_hp=exec_v["player_max_hp"];atk_dmg=exec_v["attack_damage"]
+                                    base_spd=exec_v.get("player_speed",base_spd);php_regen=exec_v["player_hp_regen"]
+                                    pc_rate=exec_v["player_crit_rate"];pd_rate=exec_v["player_dodge_rate"]
+                                    wpns=exec_v["weapons"]
+                                except Exception as e:print(f"Error applying upgrade '{opt_c['name']}': {e}")
+                                upg_done=True;is_upg=False;break # Break from 'for opt_c in choices'
+                        if upg_done: break # Break from 'for evt_u'
+                if not running or upg_done: break # Break from 'while is_upg'
+                pygame.time.wait(20) # Keep this wait
             if upg_done:php=pm_hp
         if php<=0:
             restart_c=end_screen_local(game_clock_ref)

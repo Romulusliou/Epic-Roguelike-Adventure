@@ -17,7 +17,7 @@ def init_settings():
 
     # ================= Initialization =====================
     pygame.init()
-    pygame.mixer.init() # Initialize the mixer for sound, if not already done
+    # pygame.mixer.init() # Initialize the mixer for sound, if not already done
 
     # ✅ 自適應螢幕解析度（自動適應全螢幕）
     infoObject = pygame.display.Info()
