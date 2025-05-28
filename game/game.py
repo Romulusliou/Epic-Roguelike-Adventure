@@ -3,7 +3,6 @@ import sys
 import random
 import math
 import os 
-import keyboard 
 import time
 
 # --- Module-level placeholders for settings (to be updated by run_game) ---
@@ -318,6 +317,9 @@ def run_game(settings, game_clock_ref):
     last_p_dmg_t,last_ec_t=0,0;is_upg,upg_done=False,False
     player_damage_cooldown = 500 
     bullet_cooldown = 300 
+    sword_duration = 300  # Duration of sword swing in milliseconds
+    sword_range = 50      # Range of sword attack in pixels
+    sword_fan_angle = math.radians(90) # Angle of sword attack in radians (90 degrees)
 
     def reset_state_local_ingame(): 
         nonlocal px,py,php,pm_hp,p_lvl,p_exp,base_spd,php_regen,pc_rate,pd_rate,enemies_l_ingame,bombs_l_ingame,rem_en_spawn,atk_dmg,p_eq_ingame,wpns,swd_swing,p_last_dir,game_st,is_upg,upg_done,last_p_dmg_t,last_ec_t, bullets_l_ingame, floating_texts_l_ingame
@@ -375,7 +377,9 @@ def run_game(settings, game_clock_ref):
                 if math.hypot(ec[0]-p_c[0],ec[1]-p_c[1])<150:
                     en.hp-=50
                     add_floating_text_local(floating_texts_l_ingame,"⚡ Shock!",ec)
-        if keyboard.is_pressed("space"):
+        
+        kmv=pygame.key.get_pressed();dxm,dym=0.0,0.0 # Ensure kmv is up-to-date before this check
+        if kmv[pygame.K_SPACE]:
             if wpns["sword"]and not swd_swing:swd_swing=True;swd_start_t=now;swd_hit=[]
             if wpns["bullet"]and(now-last_b_time>bullet_cooldown_val):
                 last_b_time=now;mflash_end_t=now+mflash_dur;p_c=(px+p_size/2,py+p_size/2)
@@ -459,24 +463,37 @@ def run_game(settings, game_clock_ref):
             exec_v={"player_max_hp":pm_hp,"attack_damage":atk_dmg,"base_player_speed":base_spd,
                     "player_hp_regen":php_regen,"player_crit_rate":pc_rate,"player_dodge_rate":pd_rate,
                     "weapons":wpns.copy(),"player_speed":base_spd}
+            
+            key_map = {
+                "1": pygame.K_1, "2": pygame.K_2, "3": pygame.K_3,
+                "4": pygame.K_4, "5": pygame.K_5, "6": pygame.K_6, "7": pygame.K_7
+            }
             while is_upg and not upg_done:
-                cur_blit_off=blit_off;module_screen.blit(frame,cur_blit_off) 
+                cur_blit_off=blit_off # Preserve the screen shake effect if active
+                module_screen.blit(frame,cur_blit_off) 
                 draw_upgrade_overlay_local(module_screen,choices,p_lvl)
-                pygame.display.flip()
+                pygame.display.flip() # Ensure display is updated inside this loop
+
                 for evt_u in pygame.event.get():
-                    if evt_u.type==pygame.QUIT:running=False;is_upg=False
-                if not running:break
-                for opt_c in choices:
-                    if keyboard.is_pressed(opt_c["key_binding"]):
-                        try:
-                            exec(opt_c["effect"],{"pygame":pygame,"math":math,"random":random},exec_v)
-                            pm_hp=exec_v["player_max_hp"];atk_dmg=exec_v["attack_damage"]
-                            base_spd=exec_v.get("player_speed",base_spd);php_regen=exec_v["player_hp_regen"]
-                            pc_rate=exec_v["player_crit_rate"];pd_rate=exec_v["player_dodge_rate"]
-                            wpns=exec_v["weapons"]
-                        except Exception as e:print(f"Error applying upgrade '{opt_c['name']}': {e}")
-                        upg_done=True;is_upg=False;break
-                pygame.time.wait(20)
+                    if evt_u.type==pygame.QUIT:
+                        running=False
+                        is_upg=False
+                    if not running:break # Break from inner event loop if running is false
+                    if evt_u.type == pygame.KEYDOWN: # Check for keydown events
+                        for opt_c in choices:
+                            expected_key = key_map.get(opt_c["key_binding"])
+                            if expected_key and evt_u.key == expected_key:
+                                try:
+                                    exec(opt_c["effect"],{"pygame":pygame,"math":math,"random":random},exec_v)
+                                    pm_hp=exec_v["player_max_hp"];atk_dmg=exec_v["attack_damage"]
+                                    base_spd=exec_v.get("player_speed",base_spd);php_regen=exec_v["player_hp_regen"]
+                                    pc_rate=exec_v["player_crit_rate"];pd_rate=exec_v["player_dodge_rate"]
+                                    wpns=exec_v["weapons"]
+                                except Exception as e:print(f"Error applying upgrade '{opt_c['name']}': {e}")
+                                upg_done=True;is_upg=False;break 
+                        if upg_done: break # Break from event loop if upgrade chosen
+                if not running or upg_done: break # Break from while loop
+                pygame.time.wait(20) # Keep this wait
             if upg_done:php=pm_hp
         if php<=0:
             restart_c=end_screen_local(game_clock_ref)
