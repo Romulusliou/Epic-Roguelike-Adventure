@@ -59,7 +59,8 @@ ENEMY_STATS_DATA = {
 WAVE_ENEMY_TYPES_DATA = {
     1: ["normal"], 3: ["normal", "elite", "swift"], 5: ["normal", "elite", "swift", "tank"],
     7: ["normal", "elite", "swift", "tank", "healer"],
-    9: ["normal", "elite", "swift", "tank", "healer", "bomber", "summoner"]
+    9: ["normal", "elite", "swift", "tank", "healer", "bomber", "summoner"],
+    10: ["boss"]
 }
 MAX_WAVES_CONFIG = 10 
 _current_wave_module_level = 0 # Used by Enemy.summon_enemy
@@ -318,13 +319,16 @@ def run_game(settings, game_clock_ref):
     last_p_dmg_t,last_ec_t=0,0;is_upg,upg_done=False,False
     player_damage_cooldown = 500 
     bullet_cooldown = 300 
+    space_bar_is_down = False # For IME compatibility
 
     def reset_state_local_ingame(): 
-        nonlocal px,py,php,pm_hp,p_lvl,p_exp,base_spd,php_regen,pc_rate,pd_rate,enemies_l_ingame,bombs_l_ingame,rem_en_spawn,atk_dmg,p_eq_ingame,wpns,swd_swing,p_last_dir,game_st,is_upg,upg_done,last_p_dmg_t,last_ec_t, bullets_l_ingame, floating_texts_l_ingame
+        nonlocal px,py,php,pm_hp,p_lvl,p_exp,base_spd,php_regen,pc_rate,pd_rate,enemies_l_ingame,bombs_l_ingame,rem_en_spawn,atk_dmg,p_eq_ingame,wpns,swd_swing,p_last_dir,game_st,is_upg,upg_done,last_p_dmg_t,last_ec_t, bullets_l_ingame, floating_texts_l_ingame, space_bar_is_down
+        nonlocal px,py,php,pm_hp,p_lvl,p_exp,base_spd,php_regen,pc_rate,pd_rate,enemies_l_ingame,bombs_l_ingame,rem_en_spawn,atk_dmg,p_eq_ingame,wpns,swd_swing,p_last_dir,game_st,is_upg,upg_done,last_p_dmg_t,last_ec_t, bullets_l_ingame, floating_texts_l_ingame, space_bar_is_down
         global _current_wave_module_level
         px,py=module_WIDTH//2,module_HEIGHT//2;php,pm_hp=100,100;p_lvl,p_exp=1,0;base_spd=5.0;php_regen,pc_rate,pd_rate=0.0,0.0,0.0;atk_dmg=25
         enemies_l_ingame,bombs_l_ingame,bullets_l_ingame,floating_texts_l_ingame=[],[],[],[];_current_wave_module_level=0;p_eq_ingame=[]
         wpns={"sword":True,"bullet":False};swd_swing,p_last_dir=False,(0.0,-1.0);is_upg,upg_done=False,False;last_p_dmg_t,last_ec_t=0,0
+        space_bar_is_down = False # Reset space_bar_is_down on game reset
 
     def next_wave_local_ingame(): 
         nonlocal rem_en_spawn,enemies_l_ingame
@@ -345,6 +349,11 @@ def run_game(settings, game_clock_ref):
                 if evt.key==pygame.K_ESCAPE:
                     if game_st=="playing":game_st="paused"
                     elif game_st=="paused":game_st="playing"
+                elif evt.key == pygame.K_SPACE: # Added for IME compatibility
+                    space_bar_is_down = True
+            elif evt.type == pygame.KEYUP: # Added for IME compatibility
+                if evt.key == pygame.K_SPACE:
+                    space_bar_is_down = False
             if game_st=="paused" and evt.type==pygame.MOUSEBUTTONDOWN:
                 mx,my=pygame.mouse.get_pos()
                 if(module_WIDTH//2-100<=mx<=module_WIDTH//2+100):
@@ -368,7 +377,7 @@ def run_game(settings, game_clock_ref):
             last_ec_t=now;p_c=(px+p_size/2,py+p_size/2)
             for en in enemies_l_ingame:ec=(en.x+en.size/2,en.y+en.size/2);
         if math.hypot(ec[0]-p_c[0],ec[1]-p_c[1])<150:en.hp-=50;add_floating_text_local(floating_texts_l_ingame,"⚡ Shock!",ec)
-        if keyboard.is_pressed("space"):
+        if space_bar_is_down: # Changed from keyboard.is_pressed("space") for IME compatibility
             if wpns["sword"]and not swd_swing:swd_swing=True;swd_start_t=now;swd_hit=[]
             if wpns["bullet"]and(now-last_b_time>bullet_cooldown_val):
                 last_b_time=now;mflash_end_t=now+mflash_dur;p_c=(px+p_size/2,py+p_size/2)
