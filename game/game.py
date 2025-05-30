@@ -257,11 +257,71 @@ def draw_pause_menu_local(current_screen_surf):
         current_screen_surf.blit(txt_s,txt_r)
 
 def draw_main_menu_local(current_screen_surf):
+    menu_font = module_fonts.get('upgrade', pygame.font.Font(None, 48)) # Fallback font
+    button_color = module_COLOR_DICT.get("BLUE_LIGHT", (173, 216, 230))
+    text_color = module_COLOR_DICT.get("BLACK", (0,0,0))
+    button_width, button_height = 200, 50
+    button_spacing = 20 # Vertical space between buttons
+
     ov=pygame.Surface((module_WIDTH,module_HEIGHT));ov.fill(module_COLOR_DICT.get("GRAY_DARK",(50,50,50)))
-    tit_s=module_fonts['upgrade'].render("主選單",True,module_WHITE)
-    ov.blit(tit_s,(module_WIDTH//2-tit_s.get_width()//2,module_HEIGHT//2-100))
-    opt_s=module_fonts['upgrade'].render("按 Enter 開始遊戲",True,module_WHITE)
-    ov.blit(opt_s,(module_WIDTH//2-opt_s.get_width()//2,module_HEIGHT//2));current_screen_surf.blit(ov,(0,0))
+    tit_s=menu_font.render("主選單",True,module_WHITE)
+    ov.blit(tit_s,(module_WIDTH//2-tit_s.get_width()//2,module_HEIGHT//2-150)) # Adjusted title position
+
+    # Button definitions
+    buttons = [
+        {"text": "Start", "rect": pygame.Rect(0,0,0,0), "action": "start"},
+        {"text": "Settings", "rect": pygame.Rect(0,0,0,0), "action": "settings"},
+        {"text": "Exit", "rect": pygame.Rect(0,0,0,0), "action": "exit"}
+    ]
+
+    total_button_height = (button_height * len(buttons)) + (button_spacing * (len(buttons) - 1))
+    start_y = (module_HEIGHT - total_button_height) // 2 # Centered block of buttons
+
+    for i, button_data in enumerate(buttons):
+        button_rect_x = module_WIDTH // 2 - button_width // 2
+        button_rect_y = start_y + i * (button_height + button_spacing)
+        button_data["rect"] = pygame.Rect(button_rect_x, button_rect_y, button_width, button_height)
+
+        pygame.draw.rect(ov, button_color, button_data["rect"])
+        text_surf = menu_font.render(button_data["text"], True, text_color)
+        text_rect = text_surf.get_rect(center=button_data["rect"].center)
+        ov.blit(text_surf, text_rect)
+
+    current_screen_surf.blit(ov,(0,0))
+    return buttons # Return button data for event handling
+
+def draw_settings_menu_local(current_screen_surf):
+    menu_font = module_fonts.get('upgrade', pygame.font.Font(None, 48)) # Fallback font
+    button_color = module_COLOR_DICT.get("BLUE_LIGHT", (173, 216, 230))
+    text_color = module_COLOR_DICT.get("BLACK", (0,0,0))
+    button_width, button_height = 200, 50
+
+    ov=pygame.Surface((module_WIDTH,module_HEIGHT));ov.fill(module_COLOR_DICT.get("GRAY_DARK",(50,50,50)))
+
+    title_text = "Settings Menu"
+    tit_s=menu_font.render(title_text,True,module_WHITE)
+    title_rect = tit_s.get_rect(center=(module_WIDTH//2, module_HEIGHT//2 - 100))
+    ov.blit(tit_s,title_rect)
+
+    coming_soon_text = "Coming Soon!"
+    cs_s=menu_font.render(coming_soon_text,True,module_WHITE)
+    cs_rect = cs_s.get_rect(center=(module_WIDTH//2, module_HEIGHT//2 - 20))
+    ov.blit(cs_s,cs_rect)
+
+    esc_text = "Press ESC or click Back to return"
+    esc_s=module_fonts.get('main', pygame.font.Font(None, 36)).render(esc_text,True,module_WHITE) # Smaller font
+    esc_rect = esc_s.get_rect(center=(module_WIDTH//2, module_HEIGHT//2 + 30))
+    ov.blit(esc_s,esc_rect)
+
+    # Back button
+    back_button_rect = pygame.Rect(module_WIDTH // 2 - button_width // 2, module_HEIGHT // 2 + 80, button_width, button_height)
+    pygame.draw.rect(ov, button_color, back_button_rect)
+    back_text_surf = menu_font.render("Back", True, text_color)
+    back_text_rect = back_text_surf.get_rect(center=back_button_rect.center)
+    ov.blit(back_text_surf, back_text_rect)
+
+    current_screen_surf.blit(ov,(0,0))
+    return {"rect": back_button_rect, "action": "back_to_main_menu"} # Return button data
 
 def draw_upgrade_overlay_local(base_surf, opts_list, p_lvl):
     overlay_f=pygame.Surface((module_WIDTH,module_HEIGHT),pygame.SRCALPHA);overlay_f.fill((0,0,0,120));base_surf.blit(overlay_f,(0,0))
@@ -353,9 +413,45 @@ def run_game(settings, game_clock_ref):
                     elif(module_HEIGHT//2+70<=my<=module_HEIGHT//2+110):reset_state_local_ingame();game_st="menu";start_screen_local(game_clock_ref)
         
         if game_st=="menu":
-            draw_main_menu_local(module_screen)
-            if pygame.key.get_pressed()[pygame.K_RETURN]:reset_state_local_ingame();next_wave_local_ingame();game_st="playing"
-            pygame.display.flip();continue
+            menu_buttons = draw_main_menu_local(module_screen) # Get button data
+            for evt_menu in pygame.event.get(): # Specific event loop for menu
+                if evt_menu.type == pygame.QUIT: running = False
+                if evt_menu.type == pygame.MOUSEBUTTONDOWN:
+                    if evt_menu.button == 1: # Left mouse button
+                        mouse_pos = pygame.mouse.get_pos()
+                        for button in menu_buttons:
+                            if button["rect"].collidepoint(mouse_pos):
+                                if button["action"] == "start":
+                                    reset_state_local_ingame()
+                                    next_wave_local_ingame()
+                                    game_st = "playing"
+                                elif button["action"] == "settings":
+                                    game_st = "settings_menu" # Go to settings menu
+                                elif button["action"] == "exit":
+                                    running = False # Quit the game
+            if not running: break # Exit loop if running is set to False (e.g., by Exit button)
+            pygame.display.flip()
+            continue
+
+        elif game_st == "settings_menu":
+            settings_elements = draw_settings_menu_local(module_screen)
+            for evt_settings in pygame.event.get():
+                if evt_settings.type == pygame.QUIT:
+                    running = False
+                if evt_settings.type == pygame.KEYDOWN:
+                    if evt_settings.key == pygame.K_ESCAPE:
+                        game_st = "menu" # Return to main menu
+                if evt_settings.type == pygame.MOUSEBUTTONDOWN:
+                    if evt_settings.button == 1: # Left mouse button
+                        mouse_pos = pygame.mouse.get_pos()
+                        # settings_elements is a dict for a single button
+                        if settings_elements["rect"].collidepoint(mouse_pos):
+                            if settings_elements["action"] == "back_to_main_menu":
+                                game_st = "menu" # Return to main menu
+            if not running: break
+            pygame.display.flip()
+            continue
+
         if game_st=="paused":draw_pause_menu_local(module_screen);pygame.display.flip();continue
 
         if rem_en_spawn>0 and len(enemies_l_ingame)<max_en_screen:
